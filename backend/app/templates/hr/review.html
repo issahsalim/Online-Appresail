@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h3>Final HR Approval for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
+    <hr>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">Employee & Supervisor</div>
+                <div class="card-body">
+                    <p><strong>Employee:</strong> {{ appraisal.employee.user.username }} ({{ appraisal.employee.department.name }})</p>
+                    <p><strong>Supervisor:</strong> {{ appraisal.supervisor.user.username }}</p>
+                    <p><strong>HOD:</strong> {{ appraisal.hod.user.username }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-dark text-white">HOD Comments</div>
+                <div class="card-body">
+                    <p>{{ appraisal.hod_comments|default:"No HOD comments provided." }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCORES (READ ONLY) -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">Final Scores</div>
+        <div class="card-body">
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Item</th>
+                        <th>Score (1-5)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for target in targets %}
+                    <tr>
+                        <td>Target</td>
+                        <td>{{ target.key_result_area }}</td>
+                        <td>{{ target.end_year_score|default:"N/A" }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% for comp in competencies %}
+                    <tr>
+                        <td>Competency</td>
+                        <td>{{ comp.competency.name }}</td>
+                        <td>{{ comp.end_year_score|default:"N/A" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- HR COMMENTS FORM -->
+    <div class="card mb-4 border-success">
+        <div class="card-header bg-success text-white">Final HR Approval</div>
+        <div class="card-body">
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">HR Final Comments</label>
+                    {{ form.hr_comments }}
+                </div>
+                
+                <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure? This will calculate the final score and LOCK the form permanently.')">
+                    Final Approve & Lock
+                </button>
+                <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

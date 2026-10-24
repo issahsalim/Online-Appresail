@@ -1,0 +1,49 @@
+{% extends 'base.html' %} <!-- Assuming you have a base.html -->
+
+{% block content %}
+<div class="container mt-5">
+    <h2>My Appraisal Dashboard</h2>
+    <hr>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    {% if appraisal %}
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Year: {{ appraisal.cycle.year }}</h4>
+                <h5 class="card-subtitle mb-2 text-muted">Status: 
+                    <span class="badge bg-info">{{ appraisal.get_status_display }}</span>
+                </h5>
+                
+                <p class="card-text mt-3">
+                    {% if appraisal.status == 'draft' %}
+                        You are currently filling out your goals. Once you submit, you will not be able to edit this form.
+                    {% else %}
+                        Your form has been submitted. You can view it below.
+                    {% endif %}
+                </p>
+
+                <div class="mt-4">
+                    <a href="{% url 'fill_targets' %}" class="btn btn-primary">
+                        {% if appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
+                    </a>
+
+                    {% if appraisal.status == 'draft' %}
+                        <form method="POST" action="{% url 'submit_to_supervisor' appraisal.id %}" style="display:inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to submit? You cannot edit after this.')">
+                                Submit to Supervisor
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <p>No active appraisal cycle found. Please contact HR.</p>
+    {% endif %}
+</div>
+{% endblock %}

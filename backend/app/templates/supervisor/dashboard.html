@@ -1,0 +1,140 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Supervisor Dashboard</h2>
+    <p class="text-muted">Welcome, {{ request.user.username }}. You have dual roles here.</p>
+
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button" role="tab">
+                <strong>👥 My Team ({{ pending_reviews.count }})</strong>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="my-appraisal-tab" data-bs-toggle="tab" data-bs-target="#my-appraisal" type="button" role="tab">
+                <strong>📄 My Own Appraisal</strong>
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tabs Content -->
+    <div class="tab-content" id="myTabContent">
+        
+        <!-- TAB 1: MY TEAM -->
+        <div class="tab-pane fade show active" id="team" role="tabpanel">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    {% if request.user.profile.role == 'Supervisor' %}
+                        <h5 class="card-title">Create Employee Appraisals</h5>
+                        <p>Select one employee or create appraisals for all employees assigned to you. Existing appraisals will not be overwritten.</p>
+                        <form method="post" action="{% url 'supervisor_create_appraisals' %}" class="row g-2 align-items-end mb-4">
+                            {% csrf_token %}
+                            <div class="col-md-8">
+                                <label for="employee-selection" class="form-label">Employee</label>
+                                <select id="employee-selection" name="employee_selection" class="form-select" required>
+                                    <option value="">Choose an employee or all</option>
+                                    <option value="all">All my assigned employees</option>
+                                    {% for employee in assigned_employees %}
+                                        <option value="{{ employee.id }}">
+                                            {{ employee.user.username }}{% if employee.department %} — {{ employee.department.name }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-success">Create Appraisal(s)</button>
+                            </div>
+                        </form>
+                    {% endif %}
+
+                    <h5 class="card-title">My Assigned Appraisals</h5>
+                    <table class="table table-hover mt-3">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Department</th>
+                                <th>Cycle</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for appraisal in assigned_appraisals %}
+                            <tr>
+                                <td>{{ appraisal.employee.user.username }}</td>
+                                <td>{{ appraisal.employee.department.name|default:"—" }}</td>
+                                <td>{{ appraisal.cycle.year }}</td>
+                                <td>{{ appraisal.get_status_display }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">No appraisals assigned for this cycle yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <hr>
+                    <h5 class="card-title">Appraisals Pending My Review</h5>
+                    <table class="table table-hover mt-3">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Department</th>
+                                <th>Cycle</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for appraisal in pending_reviews %}
+                            <tr>
+                                <td>{{ appraisal.employee.user.username }}</td>
+                                <td>{{ appraisal.employee.department.name }}</td>
+                                <td>{{ appraisal.cycle.year }}</td>
+                                <td>
+                                    <a href="{% url 'supervisor_review' appraisal.id %}" class="btn btn-sm btn-primary">Review Form</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">No pending team appraisals right now.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: MY OWN APPRAISAL -->
+        <div class="tab-pane fade" id="my-appraisal" role="tabpanel">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">My Appraisal Status</h5>
+                    <hr>
+                    <h6>Status: <span class="badge bg-info">{{ my_appraisal.get_status_display }}</span></h5>
+                    
+                    <p class="mt-3">As an employee, you also need to set your goals and submit them to your assigned supervisor.</p>
+                    
+                    <div class="mt-4">
+                        <a href="{% url 'fill_targets' %}" class="btn btn-primary">
+                            {% if my_appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
+                        </a>
+
+                        {% if my_appraisal.status == 'draft' %}
+                            <form method="POST" action="{% url 'submit_to_supervisor' my_appraisal.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success" onclick="return confirm('Submit to your supervisor? You cannot edit after this.')">
+                                    Submit to My Supervisor
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

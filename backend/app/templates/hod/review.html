@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h3>HOD Review for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
+    <p>Supervisor: {{ appraisal.supervisor.user.username }} | Cycle: {{ appraisal.cycle.year }}</p>
+    <hr>
+
+    <!-- TARGETS (READ ONLY) -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">Targets & Supervisor Scores</div>
+        <div class="card-body">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Key Result Area</th>
+                        <th>Mid-Year Progress</th>
+                        <th>End-Year Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for target in targets %}
+                    <tr>
+                        <td>{{ target.key_result_area }}</td>
+                        <td>{{ target.get_mid_year_progress_display|default:"N/A" }}</td>
+                        <td>{{ target.end_year_score|default:"N/A" }} / 5</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- COMPETENCIES (READ ONLY) -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">Competencies & Supervisor Scores</div>
+        <div class="card-body">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Competency</th>
+                        <th>End-Year Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in competencies %}
+                    <tr>
+                        <td>{{ comp.competency.name }}</td>
+                        <td>{{ comp.end_year_score|default:"N/A" }} / 5</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- HOD COMMENTS FORM -->
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white">Section 10: HOD Comments & Approval</div>
+        <div class="card-body">
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label">HOD Comments</label>
+                    {{ form.hod_comments }}
+                </div>
+                
+                <button type="submit" class="btn btn-success" onclick="return confirm('Submit to HR for final approval?')">
+                    Approve & Submit to HR
+                </button>
+                <a href="{% url 'hod_dashboard' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

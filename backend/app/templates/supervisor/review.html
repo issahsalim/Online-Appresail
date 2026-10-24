@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5">
+    <h3>Reviewing Appraisal for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
+    <hr>
+
+    <form method="POST">
+        {% csrf_token %}
+
+        {% if target_formset.errors or target_formset.non_form_errors or comp_formset.errors or comp_formset.non_form_errors %}
+            <div class="alert alert-danger" role="alert">
+                <strong>Scores were not saved.</strong> Please correct these errors and try again.
+                <ul class="mb-0 mt-2">
+                    {% for error in target_formset.non_form_errors %}
+                        <li>Targets: {{ error }}</li>
+                    {% endfor %}
+                    {% for errors in target_formset.errors %}
+                        {% for field, field_errors in errors.items %}
+                            {% for error in field_errors %}
+                                <li>Target {{ forloop.parentloop.parentloop.counter }} — {{ field }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in comp_formset.non_form_errors %}
+                        <li>Competencies: {{ error }}</li>
+                    {% endfor %}
+                    {% for errors in comp_formset.errors %}
+                        {% for field, field_errors in errors.items %}
+                            {% for error in field_errors %}
+                                <li>Competency {{ forloop.parentloop.parentloop.counter }} — {{ field }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">Targets & Goals</div>
+            <div class="card-body">
+                {{ target_formset.management_form }}
+                {{ target_formset.non_form_errors }}
+                {% for form in target_formset %}
+                    <div class="border p-3 mb-3 bg-light rounded">
+                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                        {{ form.non_field_errors }}
+                        <h5 class="text-primary">{{ form.instance.key_result_area }}</h5>
+                        <p><em>{{ form.instance.target_description }}</em></p>
+                        {% for field in form.visible_fields %}
+                            <div class="mb-3">
+                                {{ field.label_tag }}
+                                {{ field }}
+                                {{ field.errors }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">Competencies</div>
+            <div class="card-body">
+                {{ comp_formset.management_form }}
+                {{ comp_formset.non_form_errors }}
+                {% for form in comp_formset %}
+                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                    {{ form.non_field_errors }}
+                    <div class="row border-bottom pb-3 mb-3">
+                        <div class="col-md-4">
+                            <strong>{{ form.instance.competency.name }}</strong>
+                        </div>
+                        {% for field in form.visible_fields %}
+                            <div class="col-md-4">
+                                {{ field.label_tag }} {{ field }}
+                                {{ field.errors }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary mb-3">Save Draft Scores</button>
+    </form>
+
+    <!-- SUBMIT TO HOD BUTTON (Separate form to prevent accidental submission) -->
+    <form method="POST" action="{% url 'supervisor_submit_to_hod' appraisal.id %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure? This will lock the form and send it to the HOD.')">Submit to HOD</button>
+    </form>
+</div>
+{% endblock %} 
