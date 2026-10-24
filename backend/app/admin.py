@@ -10,6 +10,7 @@ from .models import (
     AppraisalCycle,
     Competency,
     Appraisal,
+    AppraisalReturn,
     AppraisalTarget,
     AppraisalCompetencyScore
 )
@@ -133,6 +134,18 @@ class AppraisalCompetencyScoreInline(admin.TabularInline):
     extra = 0
     autocomplete_fields = ['competency']
 
+
+class AppraisalReturnInline(admin.TabularInline):
+    model = AppraisalReturn
+    extra = 0
+    can_delete = False
+    fields = ('reviewer_name', 'stage', 'from_status', 'to_status', 'comment', 'created_at')
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Appraisal)
 class AppraisalAdmin(admin.ModelAdmin):
     list_display = ('employee', 'cycle', 'status', 'overall_percentage', 'final_rating')
@@ -145,7 +158,7 @@ class AppraisalAdmin(admin.ModelAdmin):
     list_select_related = ('employee__user', 'supervisor__user', 'cycle')
     
     # Attach the inlines
-    inlines = [AppraisalTargetInline, AppraisalCompetencyScoreInline]
+    inlines = [AppraisalTargetInline, AppraisalCompetencyScoreInline, AppraisalReturnInline]
 
     # SECURITY: If the appraisal is completed, HR shouldn't be able to edit it in the admin.
     def get_readonly_fields(self, request, obj=None):

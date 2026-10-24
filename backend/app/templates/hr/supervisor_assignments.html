@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <h2>Assign Supervisors to Employees</h2>
+    <p class="text-muted">Choose a department first. Employee and supervisor lists are limited to that department.</p>
+
+    <div class="card mb-4">
+        <div class="card-header">Assign or Change Supervisor</div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Save Supervisor Assignment</button>
+                <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary">Back to HR Dashboard</a>
+            </form>
+        </div>
+    </div>
+
+    <h3>Current Assignments</h3>
+    <div class="table-responsive">
+        <table class="table table-hover bg-white">
+            <thead class="table-dark">
+                <tr>
+                    <th>Department</th>
+                    <th>Employee</th>
+                    <th>Supervisor</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for assignment in assignments %}
+                    <tr>
+                        <td>{{ assignment.department.name }}</td>
+                        <td>{{ assignment.employee.user.username }} — {{ assignment.employee.user.get_full_name|default:assignment.employee.user.username }}</td>
+                        <td>{{ assignment.supervisor.user.username }} — {{ assignment.supervisor.user.get_full_name|default:assignment.supervisor.user.username }}</td>
+                        <td>
+                            <a
+                                class="btn btn-sm btn-outline-primary"
+                                href="?department={{ assignment.department_id }}&amp;employee={{ assignment.employee_id }}"
+                            >
+                                Change
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center">No supervisor assignments yet.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const departmentSelect = document.getElementById('id_department');
+        const employeeSelect = document.getElementById('id_employee');
+        const supervisorSelect = document.getElementById('id_supervisor');
+        const optionsUrl = "{% url 'hr_assignment_options' %}";
+        const initialEmployee = employeeSelect.value;
+        const initialSupervisor = supervisorSelect.value;
+
+        function resetSelect(select, placeholder) {
+            select.replaceChildren(new Option(placeholder, ''));
+        }
+
+        async function loadOptions(preserveEmployee, preserveSupervisor) {
+            const departmentId = departmentSelect.value;
+            resetSelect(employeeSelect, 'Select an employee');
+            resetSelect(supervisorSelect, 'Select a supervisor');
+            employeeSelect.disabled = true;
+            supervisorSelect.disabled = true;
+
+            if (!departmentId) {
+                return;
+            }
+
+            const params = new URLSearchParams({ department_id: departmentId });
+            if (preserveEmployee) {
+                params.set('employee_id', preserveEmployee);
+            }
+
+            try {
+                const response = await fetch(`${optionsUrl}?${params.toString()}`);
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not load department employees and supervisors.');
+                }
+
+                data.employees.forEach((employee) => {
+                    employeeSelect.add(new Option(employee.label, employee.id));
+                });
+                data.supervisors.forEach((supervisor) => {
+                    supervisorSelect.add(new Option(supervisor.label, supervisor.id));
+                });
+
+                if (preserveEmployee) {
+                    employeeSelect.value = preserveEmployee;
+                }
+                if (preserveSupervisor) {
+                    supervisorSelect.value = preserveSupervisor;
+                } else if (data.current_supervisor_id) {
+                    supervisorSelect.value = data.current_supervisor_id;
+                }
+            } catch (error) {
+                window.alert(error.message);
+            } finally {
+                employeeSelect.disabled = false;
+                supervisorSelect.disabled = false;
+            }
+        }
+
+        departmentSelect.addEventListener('change', function () {
+            loadOptions('', '');
+        });
+        employeeSelect.addEventListener('change', function () {
+            loadOptions(employeeSelect.value, '');
+        });
+
+        if (departmentSelect.value) {
+            loadOptions(initialEmployee, initialSupervisor);
+        } else {
+            resetSelect(employeeSelect, 'Select a department first');
+            resetSelect(supervisorSelect, 'Select a department first');
+            employeeSelect.disabled = true;
+            supervisorSelect.disabled = true;
+        }
+    })();
+</script>
+{% endblock %}

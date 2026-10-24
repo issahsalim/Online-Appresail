@@ -5,6 +5,21 @@
     <h2>My Appraisal - {{ appraisal.cycle.year }}</h2>
     <p>Status: <strong>{{ appraisal.get_status_display }}</strong></p>
 
+    {% if return_history %}
+        <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning">Return history and required corrections</div>
+            <div class="card-body">
+                {% for decision in return_history %}
+                    <div class="mb-3">
+                        <strong>{{ decision.get_stage_display }} — {{ decision.reviewer_name }}</strong>
+                        <small class="text-muted">{{ decision.created_at }}</small>
+                        <p class="mb-0">{{ decision.comment }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     {% if read_only %}
         <h3>Targets and Supervisor Review</h3>
         {% for target in targets %}
@@ -83,7 +98,7 @@
                 class="btn btn-success"
                 onclick="return confirm('Submit this appraisal to your supervisor? You will not be able to edit it afterward.')"
             >
-                Save and Submit to Supervisor
+                {% if appraisal.status == 'returned_employee' %}Save Corrections and Resubmit{% else %}Save and Submit to Supervisor{% endif %}
             </button>
         </form>
     {% endif %}

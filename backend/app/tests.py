@@ -5,7 +5,9 @@ from django.urls import reverse
 from .models import (
     Appraisal,
     AppraisalCycle,
+    AppraisalReturn,
     AppraisalTarget,
+    AssignDepartmentHod,
     Competency,
     Department,
     EmployeeProfile,
@@ -59,6 +61,169 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         self.assertRedirects(response, reverse('fill_targets'))
         self.appraisal.refresh_from_db()
         self.assertEqual(self.appraisal.targets.get().end_year_score, 4)
+
+
+class AccountProfileTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='profile-user',
+            password='Original-password-123!',
+        )
+        self.profile = EmployeeProfile.objects.create(user=self.user)
+        self.client.force_login(self.user)
+
+    def test_user_can_update_personal_profile_fields(self):
+        response = self.client.post(reverse('profile'), {
+            'first_name': 'Jordan',
+            'last_name': 'Smith',
+            'email': 'jordan@example.com',
+        })
+
+        self.assertRedirects(response, reverse('profile'))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Jordan')
+        self.assertEqual(self.user.last_name, 'Smith')
+        self.assertEqual(self.user.email, 'jordan@example.com')
+        self.assertEqual(self.user.username, 'profile-user')
+
+    def test_password_change_requires_correct_current_password_and_keeps_user_logged_in(self):
+        url = reverse('password_change')
+        response = self.client.post(url, {
+            'old_password': 'incorrect-current-password',
+            'new_password1': 'New-secure-password-123!',
+            'new_password2': 'New-secure-password-123!',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('Original-password-123!'))
+
+        response = self.client.post(url, {
+            'old_password': 'Original-password-123!',
+            'new_password1': 'New-secure-password-123!',
+            'new_password2': 'New-secure-password-123!',
+        })
+
+        self.assertRedirects(response, reverse('profile'))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('New-secure-password-123!'))
+        self.assertEqual(response.wsgi_request.user.pk, self.user.pk)
+
+
+class HRSupervisorAssignmentTests(TestCase):
+    def setUp(self):
+        self.hr_user = User.objects.create_user(
+            username='assignment-hr',
+            password='test-password',
+        )
+        EmployeeProfile.objects.create(user=self.hr_user, role='HR')
+        self.department = Department.objects.create(name='Human Resources')
+        self.other_department = Department.objects.create(name='Finance')
+        employee_user = User.objects.create_user(
+            username='assigned-employee',
+            password='test-password',
+        )
+        self.employee = EmployeeProfile.objects.create(
+            user=employee_user,
+            role='Employee',
+            department=self.department,
+        )
+        old_supervisor_user = User.objects.create_user(
+            username='old-supervisor',
+            password='test-password',
+        )
+        self.old_supervisor = EmployeeProfile.objects.create(
+            user=old_supervisor_user,
+            role='Supervisor',
+            department=self.department,
+        )
+        new_supervisor_user = User.objects.create_user(
+            username='new-supervisor',
+            password='test-password',
+        )
+        self.new_supervisor = EmployeeProfile.objects.create(
+            user=new_supervisor_user,
+            role='Supervisor',
+            department=self.department,
+        )
+        foreign_supervisor_user = User.objects.create_user(
+            username='foreign-supervisor',
+            password='test-password',
+        )
+        self.foreign_supervisor = EmployeeProfile.objects.create(
+            user=foreign_supervisor_user,
+            role='Supervisor',
+            department=self.other_department,
+        )
+        self.assignment = AssignSupervisor.objects.create(
+            department=self.department,
+            employee=self.employee,
+            supervisor=self.old_supervisor,
+        )
+        cycle = AppraisalCycle.objects.create(year=2026, is_active=True)
+        self.draft_appraisal = Appraisal.objects.create(
+            employee=self.employee,
+            cycle=cycle,
+            supervisor=self.old_supervisor,
+        )
+        self.client.force_login(self.hr_user)
+
+    def test_options_endpoint_only_returns_people_in_selected_department(self):
+        response = self.client.get(
+            reverse('hr_assignment_options'),
+            {'department_id': self.department.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(
+            [employee['id'] for employee in data['employees']],
+            [self.employee.id],
+        )
+        self.assertEqual(
+            {supervisor['id'] for supervisor in data['supervisors']},
+            {self.old_supervisor.id, self.new_supervisor.id},
+        )
+        self.assertNotIn(
+            self.foreign_supervisor.id,
+            [supervisor['id'] for supervisor in data['supervisors']],
+        )
+
+    def test_hr_can_change_assignment_and_update_draft_appraisal(self):
+        response = self.client.post(reverse('hr_supervisor_assignments'), {
+            'department': self.department.id,
+            'employee': self.employee.id,
+            'supervisor': self.new_supervisor.id,
+        })
+
+        self.assertRedirects(response, reverse('hr_supervisor_assignments'))
+        assignments = AssignSupervisor.objects.filter(employee=self.employee)
+        self.assertEqual(assignments.count(), 1)
+        self.assertEqual(assignments.get().supervisor, self.new_supervisor)
+        self.draft_appraisal.refresh_from_db()
+        self.assertEqual(self.draft_appraisal.supervisor, self.new_supervisor)
+
+    def test_hr_cannot_assign_supervisor_from_another_department(self):
+        response = self.client.post(reverse('hr_supervisor_assignments'), {
+            'department': self.department.id,
+            'employee': self.employee.id,
+            'supervisor': self.foreign_supervisor.id,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Choose a supervisor from the selected department.')
+        self.assertEqual(
+            AssignSupervisor.objects.filter(employee=self.employee).get().supervisor,
+            self.old_supervisor,
+        )
+
+    def test_non_hr_user_cannot_manage_assignments(self):
+        employee_user = self.employee.user
+        self.client.force_login(employee_user)
+
+        response = self.client.get(reverse('hr_supervisor_assignments'))
+
+        self.assertRedirects(response, reverse('dashboard_router'))
 
 
 class EmployeeCompetencySelectionTests(TestCase):
@@ -342,3 +507,157 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
         self.target.refresh_from_db()
         self.assertIsNone(self.target.end_year_score)
         self.assertIsNone(self.target.mid_year_progress)
+
+
+class AppraisalReturnWorkflowTests(TestCase):
+    def setUp(self):
+        self.department = Department.objects.create(name='Quality Assurance')
+        self.employee_user = User.objects.create_user(
+            username='return-employee',
+            password='test-password',
+        )
+        self.employee = EmployeeProfile.objects.create(
+            user=self.employee_user,
+            role='Employee',
+            department=self.department,
+        )
+        self.supervisor_user = User.objects.create_user(
+            username='return-supervisor',
+            password='test-password',
+        )
+        self.supervisor = EmployeeProfile.objects.create(
+            user=self.supervisor_user,
+            role='Supervisor',
+            department=self.department,
+        )
+        self.hod_user = User.objects.create_user(
+            username='return-hod',
+            password='test-password',
+        )
+        self.hod = EmployeeProfile.objects.create(
+            user=self.hod_user,
+            role='HOD',
+            department=self.department,
+        )
+        self.hr_user = User.objects.create_user(
+            username='return-hr',
+            password='test-password',
+        )
+        EmployeeProfile.objects.create(
+            user=self.hr_user,
+            role='HR',
+            department=self.department,
+        )
+        self.cycle = AppraisalCycle.objects.create(year=2026, is_active=True)
+        self.appraisal = Appraisal.objects.create(
+            employee=self.employee,
+            supervisor=self.supervisor,
+            hod=self.hod,
+            cycle=self.cycle,
+            status='pending_manager',
+        )
+        AssignSupervisor.objects.create(
+            department=self.department,
+            employee=self.employee,
+            supervisor=self.supervisor,
+        )
+        AssignDepartmentHod.objects.create(
+            department=self.department,
+            hod=self.hod,
+        )
+
+    def test_supervisor_must_comment_and_return_is_visible_to_employee(self):
+        self.client.force_login(self.supervisor_user)
+        url = reverse('return_appraisal', args=[self.appraisal.id])
+
+        response = self.client.post(url, {'comment': '  '})
+        self.assertRedirects(response, reverse('supervisor_review', args=[self.appraisal.id]))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_manager')
+        self.assertFalse(AppraisalReturn.objects.filter(appraisal=self.appraisal).exists())
+
+        response = self.client.post(url, {'comment': 'Please add measurable targets.'})
+        self.assertRedirects(response, reverse('supervisor_dashboard'))
+        self.appraisal.refresh_from_db()
+        decision = self.appraisal.returns.get()
+        self.assertEqual(self.appraisal.status, 'returned_employee')
+        self.assertEqual(decision.to_status, 'returned_employee')
+
+        self.client.force_login(self.employee_user)
+        response = self.client.get(reverse('fill_targets'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Please add measurable targets.')
+
+    def test_employee_can_correct_and_resubmit_to_original_supervisor(self):
+        self.appraisal.status = 'returned_employee'
+        self.appraisal.save(update_fields=['status'])
+        competency = Competency.objects.create(name='Accuracy', competency_type='core')
+        self.client.force_login(self.employee_user)
+
+        response = self.client.post(reverse('fill_targets'), {
+            'targets-TOTAL_FORMS': '5',
+            'targets-INITIAL_FORMS': '0',
+            'targets-MIN_NUM_FORMS': '0',
+            'targets-MAX_NUM_FORMS': '5',
+            'competencies': [str(competency.id)],
+            'action': 'submit',
+        })
+
+        self.assertRedirects(response, reverse('employee_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_manager')
+        self.assertEqual(self.appraisal.supervisor, self.supervisor)
+        self.assertTrue(self.appraisal.competency_scores.filter(competency=competency).exists())
+
+    def test_hod_returns_to_supervisor_and_supervisor_can_resubmit(self):
+        self.appraisal.status = 'pending_hod'
+        self.appraisal.save(update_fields=['status'])
+        self.client.force_login(self.hod_user)
+
+        response = self.client.post(
+            reverse('return_appraisal', args=[self.appraisal.id]),
+            {'comment': 'Please correct the competency scores.'},
+        )
+
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'returned_supervisor')
+
+        self.client.force_login(self.supervisor_user)
+        response = self.client.get(reverse('supervisor_review', args=[self.appraisal.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Please correct the competency scores.')
+
+        response = self.client.post(
+            reverse('supervisor_submit_to_hod', args=[self.appraisal.id]),
+        )
+        self.assertRedirects(response, reverse('supervisor_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_hod')
+
+    def test_hr_returns_to_hod_and_hod_can_resubmit(self):
+        self.appraisal.status = 'pending_hr'
+        self.appraisal.save(update_fields=['status'])
+        self.client.force_login(self.hr_user)
+
+        response = self.client.post(
+            reverse('return_appraisal', args=[self.appraisal.id]),
+            {'comment': 'Please clarify the final comments.'},
+        )
+
+        self.assertRedirects(response, reverse('hr_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'returned_hod')
+
+        self.client.force_login(self.hod_user)
+        response = self.client.get(reverse('hod_review', args=[self.appraisal.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Please clarify the final comments.')
+
+        response = self.client.post(
+            reverse('hod_review', args=[self.appraisal.id]),
+            {'hod_comments': 'Updated final comments.'},
+        )
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_hr')

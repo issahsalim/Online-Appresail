@@ -98,6 +98,9 @@ class Appraisal(models.Model):
         ('pending_manager', 'Pending Supervisor Review'),
         ('pending_hod', 'Pending HOD Review'),
         ('pending_hr', 'Pending HR Final Approval'),
+        ('returned_employee', 'Returned to Employee'),
+        ('returned_supervisor', 'Returned to Supervisor'),
+        ('returned_hod', 'Returned to HOD'),
         ('completed', 'Completed & Locked'),
     ]
 
@@ -158,6 +161,40 @@ class Appraisal(models.Model):
             self.final_rating = "Needs Improvement"
         else:
             self.final_rating = "Unacceptable"
+
+
+class AppraisalReturn(models.Model):
+    RETURN_STAGE_CHOICES = [
+        ('supervisor', 'Supervisor review'),
+        ('hod', 'HOD review'),
+        ('hr', 'HR review'),
+    ]
+
+    appraisal = models.ForeignKey(
+        Appraisal,
+        on_delete=models.CASCADE,
+        related_name='returns',
+    )
+    reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appraisal_returns',
+    )
+    reviewer_name = models.CharField(max_length=150)
+    stage = models.CharField(max_length=20, choices=RETURN_STAGE_CHOICES)
+    from_status = models.CharField(max_length=30)
+    to_status = models.CharField(max_length=30)
+    comment = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+    def __str__(self):
+        return f"{self.appraisal} returned by {self.reviewer_name} ({self.stage})"
+
 
 # ==========================================
 # 4. APPRAISAL TARGETS (SECTION 2, 3 & 4)

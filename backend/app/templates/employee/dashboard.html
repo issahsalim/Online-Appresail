@@ -17,9 +17,16 @@
                 <h5 class="card-subtitle mb-2 text-muted">Status: 
                     <span class="badge bg-info">{{ appraisal.get_status_display }}</span>
                 </h5>
+                {% if appraisal.status == 'returned_employee' and latest_return %}
+                    <div class="alert alert-warning mt-3">
+                        <strong>Returned by {{ latest_return.reviewer_name }} ({{ latest_return.get_stage_display }}):</strong>
+                        {{ latest_return.comment }}
+                        <div class="mt-2">Please update your appraisal, then use “Save and Submit to Supervisor”.</div>
+                    </div>
+                {% endif %}
                 
                 <p class="card-text mt-3">
-                    {% if appraisal.status == 'draft' %}
+                    {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %}
                         You are currently filling out your goals. Once you submit, you will not be able to edit this form.
                     {% else %}
                         Your form has been submitted. You can view it below.
@@ -28,7 +35,7 @@
 
                 <div class="mt-4">
                     <a href="{% url 'fill_targets' %}" class="btn btn-primary">
-                        {% if appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
+                        {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %} Edit My Goals {% else %} View My Goals {% endif %}
                     </a>
 
                     {% if appraisal.status == 'draft' %}

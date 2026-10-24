@@ -4,6 +4,21 @@
     <h3>Reviewing Appraisal for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
     <hr>
 
+    {% if return_history %}
+        <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning">Return history and required corrections</div>
+            <div class="card-body">
+                {% for decision in return_history %}
+                    <div class="mb-3">
+                        <strong>{{ decision.get_stage_display }} — {{ decision.reviewer_name }}</strong>
+                        <small class="text-muted">{{ decision.created_at }}</small>
+                        <p class="mb-0">{{ decision.comment }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <form method="POST">
         {% csrf_token %}
 
@@ -87,7 +102,18 @@
     <!-- SUBMIT TO HOD BUTTON (Separate form to prevent accidental submission) -->
     <form method="POST" action="{% url 'supervisor_submit_to_hod' appraisal.id %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure? This will lock the form and send it to the HOD.')">Submit to HOD</button>
+        <button type="submit" class="btn btn-success" onclick="return confirm('Submit this appraisal to the HOD?')">Submit to HOD</button>
+    </form>
+
+    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mt-4 border-warning">
+        {% csrf_token %}
+        <div class="card-header bg-warning">Return to Employee for Corrections</div>
+        <div class="card-body">
+            {{ return_form.comment.label_tag }}
+            {{ return_form.comment }}
+            {{ return_form.comment.errors }}
+            <button type="submit" class="btn btn-warning mt-3">Return to Employee</button>
+        </div>
     </form>
 </div>
 {% endblock %} 

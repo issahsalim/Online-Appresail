@@ -5,6 +5,21 @@
     <p>Supervisor: {{ appraisal.supervisor.user.username }} | Cycle: {{ appraisal.cycle.year }}</p>
     <hr>
 
+    {% if return_history %}
+        <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning">Return history and required corrections</div>
+            <div class="card-body">
+                {% for decision in return_history %}
+                    <div class="mb-3">
+                        <strong>{{ decision.get_stage_display }} — {{ decision.reviewer_name }}</strong>
+                        <small class="text-muted">{{ decision.created_at }}</small>
+                        <p class="mb-0">{{ decision.comment }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
     <!-- TARGETS (READ ONLY) -->
     <div class="card mb-4">
         <div class="card-header bg-secondary text-white">Targets & Supervisor Scores</div>
@@ -70,6 +85,17 @@
                 <a href="{% url 'hod_dashboard' %}" class="btn btn-secondary">Cancel</a>
             </form>
         </div>
+
+        <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 border-warning">
+            {% csrf_token %}
+            <div class="card-header bg-warning">Return to Supervisor for Reassessment</div>
+            <div class="card-body">
+                {{ return_form.comment.label_tag }}
+                {{ return_form.comment }}
+                {{ return_form.comment.errors }}
+                <button type="submit" class="btn btn-warning mt-3">Return to Supervisor</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
