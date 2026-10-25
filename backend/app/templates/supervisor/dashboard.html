@@ -12,11 +12,13 @@
                 <strong>👥 My Team ({{ pending_reviews.count }})</strong>
             </button>
         </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="my-appraisal-tab" data-bs-toggle="tab" data-bs-target="#my-appraisal" type="button" role="tab">
-                <strong>📄 My Own Appraisal</strong>
-            </button>
-        </li>
+        {% if has_supervisor %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="my-appraisal-tab" data-bs-toggle="tab" data-bs-target="#my-appraisal" type="button" role="tab">
+                    <strong>📄 My Own Appraisal</strong>
+                </button>
+            </li>
+        {% endif %}
     </ul>
 
     <!-- Tabs Content -->
@@ -108,32 +110,34 @@
         </div>
 
         <!-- TAB 2: MY OWN APPRAISAL -->
-        <div class="tab-pane fade" id="my-appraisal" role="tabpanel">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">My Appraisal Status</h5>
-                    <hr>
-                    <h6>Status: <span class="badge bg-info">{{ my_appraisal.get_status_display }}</span></h5>
-                    
-                    <p class="mt-3">As an employee, you also need to set your goals and submit them to your assigned supervisor.</p>
-                    
-                    <div class="mt-4">
-                        <a href="{% url 'fill_targets' %}" class="btn btn-primary">
-                            {% if my_appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
-                        </a>
+        {% if has_supervisor %}
+            <div class="tab-pane fade" id="my-appraisal" role="tabpanel">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">My Appraisal Status</h5>
+                        <hr>
+                        <h6>Status: <span class="badge bg-info">{{ my_appraisal.get_status_display }}</span></h6>
 
-                        {% if my_appraisal.status == 'draft' %}
-                            <form method="POST" action="{% url 'submit_to_supervisor' my_appraisal.id %}" style="display:inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-success" onclick="return confirm('Submit to your supervisor? You cannot edit after this.')">
-                                    Submit to My Supervisor
-                                </button>
-                            </form>
-                        {% endif %}
+                        <p class="mt-3">As an employee, you also need to set your goals and submit them to your assigned supervisor.</p>
+
+                        <div class="mt-4">
+                            <a href="{% url 'fill_targets' %}" class="btn btn-primary">
+                                {% if my_appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
+                            </a>
+
+                            {% if my_appraisal.status == 'draft' %}
+                                <form method="POST" action="{% url 'submit_to_supervisor' my_appraisal.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success" onclick="return confirm('Submit to your supervisor? You cannot edit after this.')">
+                                        Submit to My Supervisor
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        {% endif %}
 
     </div>
 </div>

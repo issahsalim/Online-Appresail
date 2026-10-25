@@ -4,6 +4,8 @@
     <h3>HOD Review for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
     <p>Supervisor: {{ appraisal.supervisor.user.username }} | Cycle: {{ appraisal.cycle.year }}</p>
     <hr>
+    {% include 'appraisal/_employee_details.html' %}
+    {% include 'appraisal/_training.html' %}
 
     {% if return_history %}
         <div class="card mb-4 border-warning">
@@ -53,13 +55,18 @@
                 <thead>
                     <tr>
                         <th>Competency</th>
+                        <th>Description</th>
                         <th>End-Year Score</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for comp in competencies %}
                     <tr>
-                        <td>{{ comp.competency.name }}</td>
+                        <td>
+                            <strong>{{ comp.competency.name }}</strong>
+                            <div><span class="badge bg-primary-subtle text-primary">{{ comp.competency.get_competency_type_display }}</span></div>
+                        </td>
+                        <td>{% include 'appraisal/_competency_description.html' with competency=comp.competency %}</td>
                         <td>{{ comp.end_year_score|default:"N/A" }} / 5</td>
                     </tr>
                     {% endfor %}

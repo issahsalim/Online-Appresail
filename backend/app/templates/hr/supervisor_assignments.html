@@ -29,6 +29,28 @@
     </div>
 
     <h3>Current Assignments</h3>
+    <div class="row g-3 mb-3">
+        <div class="col-md-7">
+            <label for="assignment-search" class="form-label">Search assignments</label>
+            <input
+                id="assignment-search"
+                type="search"
+                class="form-control"
+                placeholder="Staff ID, employee, supervisor, or department"
+                autocomplete="off"
+            >
+        </div>
+        <div class="col-md-5">
+            <label for="assignment-department-filter" class="form-label">Filter by department</label>
+            <select id="assignment-department-filter" class="form-select">
+                <option value="">All departments</option>
+                {% for department in departments %}
+                    <option value="{{ department.id }}">{{ department.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <p id="assignment-search-status" class="text-muted" role="status" aria-live="polite">Loading assignments...</p>
     <div class="table-responsive">
         <table class="table table-hover bg-white">
             <thead class="table-dark">
@@ -39,29 +61,12 @@
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for assignment in assignments %}
-                    <tr>
-                        <td>{{ assignment.department.name }}</td>
-                        <td>{{ assignment.employee.user.username }} — {{ assignment.employee.user.get_full_name|default:assignment.employee.user.username }}</td>
-                        <td>{{ assignment.supervisor.user.username }} — {{ assignment.supervisor.user.get_full_name|default:assignment.supervisor.user.username }}</td>
-                        <td>
-                            <a
-                                class="btn btn-sm btn-outline-primary"
-                                href="?department={{ assignment.department_id }}&amp;employee={{ assignment.employee_id }}"
-                            >
-                                Change
-                            </a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="4" class="text-center">No supervisor assignments yet.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
+            <tbody id="assignment-results"></tbody>
         </table>
     </div>
+    <nav aria-label="Supervisor assignment results">
+        <ul id="assignment-pagination" class="pagination"></ul>
+    </nav>
 </div>
 
 <script>
@@ -72,6 +77,14 @@
         const optionsUrl = "{% url 'hr_assignment_options' %}";
         const initialEmployee = employeeSelect.value;
         const initialSupervisor = supervisorSelect.value;
+        const searchInput = document.getElementById('assignment-search');
+        const departmentFilter = document.getElementById('assignment-department-filter');
+        const resultsBody = document.getElementById('assignment-results');
+        const statusElement = document.getElementById('assignment-search-status');
+        const pagination = document.getElementById('assignment-pagination');
+        const searchUrl = "{% url 'hr_search_supervisor_assignments' %}";
+        let searchTimer;
+        let activeSearch;
 
         function resetSelect(select, placeholder) {
             select.replaceChildren(new Option(placeholder, ''));
@@ -129,6 +142,111 @@
         employeeSelect.addEventListener('change', function () {
             loadOptions(employeeSelect.value, '');
         });
+
+        function renderPagination(data) {
+            pagination.replaceChildren();
+            if (data.pages <= 1) {
+                return;
+            }
+
+            const addPageButton = (label, page, disabled, active) => {
+                const item = document.createElement('li');
+                item.className = `page-item${disabled ? ' disabled' : ''}${active ? ' active' : ''}`;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'page-link';
+                button.textContent = label;
+                button.disabled = disabled;
+                button.addEventListener('click', () => searchAssignments(page));
+                item.append(button);
+                pagination.append(item);
+            };
+
+            addPageButton('Previous', data.page - 1, !data.has_previous, false);
+            const start = Math.max(1, data.page - 2);
+            const end = Math.min(data.pages, data.page + 2);
+            for (let page = start; page <= end; page += 1) {
+                addPageButton(String(page), page, false, page === data.page);
+            }
+            addPageButton('Next', data.page + 1, !data.has_next, false);
+        }
+
+        function renderAssignments(data) {
+            resultsBody.replaceChildren();
+            if (!data.results.length) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 4;
+                cell.className = 'text-center';
+                cell.textContent = 'No matching supervisor assignments found.';
+                row.append(cell);
+                resultsBody.append(row);
+                return;
+            }
+
+            data.results.forEach((assignment) => {
+                const row = document.createElement('tr');
+                [
+                    assignment.department,
+                    `${assignment.employee_staff_id} - ${assignment.employee_name}`,
+                    `${assignment.supervisor_staff_id} - ${assignment.supervisor_name}`,
+                ].forEach((value) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = value;
+                    row.append(cell);
+                });
+
+                const actionCell = document.createElement('td');
+                const editLink = document.createElement('a');
+                editLink.className = 'btn btn-sm btn-outline-primary';
+                editLink.href = assignment.edit_url;
+                editLink.textContent = 'Change';
+                actionCell.append(editLink);
+                row.append(actionCell);
+                resultsBody.append(row);
+            });
+        }
+
+        async function searchAssignments(page) {
+            if (activeSearch) {
+                activeSearch.abort();
+            }
+            activeSearch = new AbortController();
+            const params = new URLSearchParams({
+                q: searchInput.value,
+                department: departmentFilter.value,
+                page: String(page || 1),
+            });
+            statusElement.textContent = 'Searching assignments...';
+
+            try {
+                const response = await fetch(`${searchUrl}?${params.toString()}`, {
+                    signal: activeSearch.signal,
+                    headers: {'Accept': 'application/json'},
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not search supervisor assignments.');
+                }
+                renderAssignments(data);
+                renderPagination(data);
+                statusElement.textContent = `${data.total} assignment${data.total === 1 ? '' : 's'} found.`;
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    return;
+                }
+                resultsBody.replaceChildren();
+                pagination.replaceChildren();
+                statusElement.textContent = error.message;
+            }
+        }
+
+        searchInput.addEventListener('input', function () {
+            window.clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(() => searchAssignments(1), 250);
+        });
+        departmentFilter.addEventListener('change', () => searchAssignments(1));
+        searchAssignments(1);
 
         if (departmentSelect.value) {
             loadOptions(initialEmployee, initialSupervisor);

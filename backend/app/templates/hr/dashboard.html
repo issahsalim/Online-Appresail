@@ -36,5 +36,222 @@
             {% endfor %}
         </tbody>
     </table>
-</div>
+
+    <hr class="my-5">
+    <h3>Completed Appraisals</h3>
+    <p class="text-muted">Completed appraisals are locked for HR. Use the superuser Django admin only when a correction is required.</p>
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <label for="completed-search" class="form-label">Search completed appraisals</label>
+            <input
+                id="completed-search"
+                type="search"
+                class="form-control"
+                placeholder="Staff ID, name, supervisor, HOD, or rating"
+                autocomplete="off"
+            >
+        </div>
+        <div class="col-md-3">
+            <label for="completed-department" class="form-label">Department</label>
+            <select id="completed-department" class="form-select">
+                <option value="">All departments</option>
+                {% for department in departments %}
+                    <option value="{{ department.id }}">{{ department.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="completed-cycle" class="form-label">Cycle year</label>
+            <select id="completed-cycle" class="form-select">
+                <option value="">All years</option>
+                {% for cycle in cycles %}
+                    <option value="{{ cycle.year }}">{{ cycle.year }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <p id="completed-search-status" class="text-muted" role="status" aria-live="polite">Loading completed appraisals...</p>
+    <div class="table-responsive">
+        <table class="table table-hover bg-white shadow-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>Employee (Staff ID)</th>
+                    <th>Department</th>
+                    <th>Cycle</th>
+                    <th>Supervisor</th>
+                    <th>HOD</th>
+                    <th>Overall</th>
+                    <th>Final Rating</th>
+                    <th>Action</th>
+                </tr> 
+            </thead>
+            <tbody id="completed-results"></tbody>
+        </table> 
+    </div>
+    <nav aria-label="Completed appraisal results">
+        <ul id="completed-pagination" class="pagination"></ul>
+    </nav>
+</div>  
+
+<h1>Change User Role</h1>
+<form action="{% url 'hr_dashboard' %}" method="post">
+    {% csrf_token %}
+    <div class="table-responsive">
+        <table class="table table-hover bg-white shadow-sm">
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Current Role</th>
+                    <th>Change Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user_profile in users %}
+                    <tr>
+                        <td>{{ user_profile.user.username }}</td>
+                        <td>{{ user_profile.get_role_display }}</td>
+                        <td> 
+                            <label class="visually-hidden" for="role-{{ user_profile.id }}">
+                                Role for {{ user_profile.user.username }}
+                            </label> 
+                            <select  
+                                id="role-{{ user_profile.id }}"
+                                name="role_{{ user_profile.id }}"
+                                class="form-select"
+                            > 
+                                {% for role_value, role_label in role_choices %}
+                                    <option value="{{ role_value }}" {% if user_profile.role == role_value %}selected{% endif %}>
+                                        {{ role_label }}
+                                    </option> 
+                                {% endfor %}
+                            </select> 
+                        </td> 
+                    </tr>
+                {% empty %}
+                    <tr> 
+                        <td colspan="3" class="text-center">No users are available to update.</td>
+                    </tr> 
+                {% endfor %}
+            </tbody>
+        </table>           
+    </div>
+    <button type="submit" class="btn btn-primary">Save Role Changes</button>
+</form>
+
+<script>
+    (function () {
+        const searchInput = document.getElementById('completed-search');
+        const departmentSelect = document.getElementById('completed-department');
+        const cycleSelect = document.getElementById('completed-cycle');
+        const statusElement = document.getElementById('completed-search-status');
+        const resultsBody = document.getElementById('completed-results');
+        const pagination = document.getElementById('completed-pagination');
+        const searchUrl = "{% url 'hr_search_completed_appraisals' %}";
+        let searchTimer;
+        let activeSearch;
+
+        function renderPagination(data) {
+            pagination.replaceChildren();
+            if (data.pages <= 1) return;
+
+            const addButton = (label, page, disabled, active) => {
+                const item = document.createElement('li');
+                item.className = `page-item${disabled ? ' disabled' : ''}${active ? ' active' : ''}`;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'page-link';
+                button.textContent = label;
+                button.disabled = disabled;
+                button.addEventListener('click', () => searchCompleted(page));
+                item.append(button);
+                pagination.append(item);
+            };
+
+            addButton('Previous', data.page - 1, !data.has_previous, false);
+            for (let page = Math.max(1, data.page - 2); page <= Math.min(data.pages, data.page + 2); page += 1) {
+                addButton(String(page), page, false, page === data.page);
+            }
+            addButton('Next', data.page + 1, !data.has_next, false);
+        }
+
+        function renderResults(data) {
+            resultsBody.replaceChildren();
+            if (!data.results.length) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 8;
+                cell.className = 'text-center';
+                cell.textContent = 'No completed appraisals match these filters.';
+                row.append(cell);
+                resultsBody.append(row);
+                return;
+            }
+
+            data.results.forEach((appraisal) => {
+                const row = document.createElement('tr');
+                [
+                    `${appraisal.employee_staff_id} - ${appraisal.employee_name}`,
+                    appraisal.department,
+                    String(appraisal.cycle_year),
+                    appraisal.supervisor,
+                    appraisal.hod,
+                    appraisal.overall_percentage === '—' ? '—' : `${appraisal.overall_percentage}%`,
+                    appraisal.final_rating,
+                ].forEach((value) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = value;
+                    row.append(cell);
+                });
+
+                const actionCell = document.createElement('td');
+                const viewLink = document.createElement('a');
+                viewLink.className = 'btn btn-sm btn-outline-primary';
+                viewLink.href = appraisal.view_url;
+                viewLink.textContent = 'View';
+                actionCell.append(viewLink);
+                row.append(actionCell);
+                resultsBody.append(row);
+            });
+        }
+
+        async function searchCompleted(page) {
+            if (activeSearch) activeSearch.abort();
+            activeSearch = new AbortController();
+            const params = new URLSearchParams({
+                q: searchInput.value,
+                department: departmentSelect.value,
+                cycle_year: cycleSelect.value,
+                page: String(page || 1),
+            });
+            statusElement.textContent = 'Searching completed appraisals...';
+
+            try {
+                const response = await fetch(`${searchUrl}?${params.toString()}`, {
+                    signal: activeSearch.signal,
+                    headers: {'Accept': 'application/json'},
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Could not search completed appraisals.');
+                }
+                renderResults(data);
+                renderPagination(data);
+                statusElement.textContent = `${data.total} completed appraisal${data.total === 1 ? '' : 's'} found.`;
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                resultsBody.replaceChildren();
+                pagination.replaceChildren();
+                statusElement.textContent = error.message;
+            }
+        }
+
+        searchInput.addEventListener('input', () => {
+            window.clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(() => searchCompleted(1), 250);
+        });
+        departmentSelect.addEventListener('change', () => searchCompleted(1));
+        cycleSelect.addEventListener('change', () => searchCompleted(1));
+        searchCompleted(1);
+    })();
+</script>
 {% endblock %}

@@ -3,6 +3,8 @@
 <div class="container mt-5">
     <h3>Reviewing Appraisal for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
     <hr>
+    {% include 'appraisal/_employee_details.html' %}
+    {% include 'appraisal/_training.html' %}
 
     {% if return_history %}
         <div class="card mb-4 border-warning">
@@ -81,16 +83,22 @@
                 {% for form in comp_formset %}
                     {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
                     {{ form.non_field_errors }}
-                    <div class="row border-bottom pb-3 mb-3">
-                        <div class="col-md-4">
-                            <strong>{{ form.instance.competency.name }}</strong>
-                        </div>
-                        {% for field in form.visible_fields %}
-                            <div class="col-md-4">
-                                {{ field.label_tag }} {{ field }}
-                                {{ field.errors }}
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <h5 class="card-title">{{ form.instance.competency.name }}</h5>
+                                <span class="badge bg-primary-subtle text-primary">{{ form.instance.competency.get_competency_type_display }}</span>
                             </div>
-                        {% endfor %}
+                            <div class="text-muted mb-3">{% include 'appraisal/_competency_description.html' with competency=form.instance.competency %}</div>
+                            <div class="row g-3">
+                                {% for field in form.visible_fields %}
+                                    <div class="col-md-4">
+                                        {{ field.label_tag }} {{ field }}
+                                        {{ field.errors }}
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                     </div>
                 {% endfor %}
             </div>

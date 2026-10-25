@@ -10,6 +10,7 @@ from .models import (
     AppraisalCycle,
     Competency,
     Appraisal,
+    AppraisalTraining,
     AppraisalReturn,
     AppraisalTarget,
     AppraisalCompetencyScore
@@ -84,7 +85,7 @@ class AssignSupervisorAdmin(admin.ModelAdmin):
             department_id = request.GET.get('department')
             if department_id:
                 kwargs["queryset"] = EmployeeProfile.objects.filter(
-                    role='Employee', 
+                    role__in=['Employee', 'Supervisor'],
                     department_id=department_id
                 )
         elif db_field.name == "supervisor":
@@ -109,7 +110,7 @@ class AssignDepartmentHodAdmin(admin.ModelAdmin):
 
 @admin.register(AppraisalCycle)
 class AppraisalCycleAdmin(admin.ModelAdmin):
-    list_display = ('year', 'is_active')
+    list_display = ('year', 'report_period_from', 'report_period_to', 'is_active')
     list_filter = ('is_active',)
 
 @admin.register(Competency)
@@ -127,12 +128,41 @@ class CompetencyAdmin(admin.ModelAdmin):
 class AppraisalTargetInline(admin.TabularInline):
     model = AppraisalTarget
     extra = 0
-    # You can make certain fields read-only if needed here
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return [field.name for field in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
+
+    def has_add_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_add_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj)
 
 class AppraisalCompetencyScoreInline(admin.TabularInline):
     model = AppraisalCompetencyScore
     extra = 0
     autocomplete_fields = ['competency']
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return [field.name for field in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
+
+    def has_add_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_add_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 class AppraisalReturnInline(admin.TabularInline):
@@ -144,6 +174,26 @@ class AppraisalReturnInline(admin.TabularInline):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+
+class AppraisalTrainingInline(admin.TabularInline):
+    model = AppraisalTraining
+    extra = 0
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return [field.name for field in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
+
+    def has_add_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_add_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj)
 
 
 @admin.register(Appraisal)
@@ -158,12 +208,16 @@ class AppraisalAdmin(admin.ModelAdmin):
     list_select_related = ('employee__user', 'supervisor__user', 'cycle')
     
     # Attach the inlines
-    inlines = [AppraisalTargetInline, AppraisalCompetencyScoreInline, AppraisalReturnInline]
+    inlines = [
+        AppraisalTargetInline,
+        AppraisalCompetencyScoreInline,
+        AppraisalTrainingInline,
+        AppraisalReturnInline,
+    ]
 
     # SECURITY: If the appraisal is completed, HR shouldn't be able to edit it in the admin.
     def get_readonly_fields(self, request, obj=None):
-        if obj and obj.status == 'completed':
-            # Lock ALL fields if completed
+        if obj and obj.status == 'completed' and not request.user.is_superuser:
             return [f.name for f in self.model._meta.fields]
         return super().get_readonly_fields(request, obj)
         

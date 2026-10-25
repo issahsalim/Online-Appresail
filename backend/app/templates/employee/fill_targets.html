@@ -5,6 +5,10 @@
     <h2>My Appraisal - {{ appraisal.cycle.year }}</h2>
     <p>Status: <strong>{{ appraisal.get_status_display }}</strong></p>
 
+    {% if read_only %}
+        {% include 'appraisal/_employee_details.html' %}
+    {% endif %}
+
     {% if return_history %}
         <div class="card mb-4 border-warning">
             <div class="card-header bg-warning">Return history and required corrections</div>
@@ -41,18 +45,25 @@
 
         <h3>Competency Review</h3>
         {% for score in competencies %}
-            <div class="card mb-3">
+            <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-body">
-                    <h5>{{ score.competency.name }}</h5>
-                    <p><strong>Type:</strong> {{ score.competency.get_competency_type_display }}</p>
-                    <p><strong>Mid-year progress:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</p>
-                    <p><strong>Mid-year remark:</strong> {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</p>
-                    <p><strong>End-year score:</strong> {{ score.end_year_score|default:"Not scored yet" }}</p>
+                    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                        <h5 class="card-title mb-0">{{ score.competency.name }}</h5>
+                        <span class="badge bg-primary-subtle text-primary">{{ score.competency.get_competency_type_display }}</span>
+                    </div>
+                    <div class="text-muted mb-3">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</div>
+                    <div class="row g-2">
+                        <div class="col-md-4"><strong>Mid-year progress:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</div>
+                        <div class="col-md-4"><strong>Mid-year remark:</strong> {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</div>
+                        <div class="col-md-4"><strong>End-year score:</strong> {{ score.end_year_score|default:"Not scored yet" }}</div>
+                    </div>
                 </div>
             </div>
         {% empty %}
             <p>No competency reviews have been added to this appraisal.</p>
         {% endfor %}
+
+        {% include 'appraisal/_training.html' %}
 
         <h3>Review Comments and Final Result</h3>
         <p><strong>Supervisor:</strong> {{ appraisal.supervisor_comments|default:"No comments yet." }}</p>
@@ -61,13 +72,59 @@
         <p><strong>Overall percentage:</strong> {{ appraisal.overall_percentage|default:"Not calculated yet" }}</p>
         <p><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
     {% else %}
+        <form method="POST">
+            {% csrf_token %}
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">Section 1: Employee Information</div>
+            <div class="card-body">
+                <p class="text-muted">Check these details and complete any missing information. Your information is saved with this appraisal.</p>
+                <div class="row">
+                    {% for field in employee_info_form %}
+                        <div class="col-md-6 mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+                {% if employee_info_form.non_field_errors %}<div class="alert alert-danger">{{ employee_info_form.non_field_errors }}</div>{% endif %}
+                <p class="mb-0"><strong>Period of report:</strong> {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"Not set" }} to {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"Not set" }} <span class="text-muted">(set by HR for this cycle)</span></p>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">Training Received During the Year Under Review</div>
+                <div class="card-body">
+                    <p class="text-muted">List up to four training programmes attended during this appraisal period. Leave unused rows blank.</p>
+                    {{ training_formset.management_form }}
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead><tr><th>Institution</th><th>Date</th><th>Programme</th></tr></thead>
+                            <tbody>
+                                {% for form in training_formset %}
+                                    <tr>
+                                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                        {% for field in form.visible_fields %}
+                                            <td>
+                                                {{ field }}
+                                                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                            </td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <h3>Key Result Areas (Targets)</h3>
         <p>Please fill out your goals for the year. You can leave rows blank if you have fewer than 5 goals.</p>
 
-        <form method="POST">
-            {% csrf_token %}
             {% if formset.non_form_errors %}
                 <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
+            {% endif %}
+            {% if training_formset.non_form_errors %}
+                <div class="alert alert-danger">{{ training_formset.non_form_errors }}</div>
             {% endif %}
             <table class="table table-bordered">
                 {{ formset.management_form }}
@@ -86,7 +143,37 @@
                 <div class="card-body">
                     <p>{{ competency_form.competencies.help_text }}</p>
                     {{ competency_form.competencies.errors }}
-                    {{ competency_form.competencies }}
+                    <div class="row g-3">
+                        {% for competency in available_competencies %}
+                            <div class="col-12">
+                                <div class="card h-100 border">
+                                    <div class="card-body">
+                                        <div class="form-check">
+                                            <input
+                                                class="form-check-input"
+                                                type="checkbox"
+                                                name="competencies"
+                                                value="{{ competency.id }}"
+                                                id="competency-{{ competency.id }}"
+                                                {% if competency.id|stringformat:"s" in selected_competency_ids %}checked{% endif %}
+                                            >
+                                            <label class="form-check-label w-100" for="competency-{{ competency.id }}">
+                                                <span class="d-flex justify-content-between align-items-center gap-2">
+                                                    <strong>{{ competency.name }}</strong>
+                                                    <span class="badge bg-primary-subtle text-primary">{{ competency.get_competency_type_display }}</span>
+                                                </span>
+                                                <span class="d-block text-muted mt-2">{% include 'appraisal/_competency_description.html' with competency=competency %}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="col-12">
+                                <div class="alert alert-info mb-0">No competencies are available yet. Please contact HR.</div>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 

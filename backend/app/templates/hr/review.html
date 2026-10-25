@@ -3,6 +3,8 @@
 <div class="container mt-5 mb-5">
     <h3>Final HR Approval for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
     <hr>
+    {% include 'appraisal/_employee_details.html' %}
+    {% include 'appraisal/_training.html' %}
 
     {% if return_history %}
         <div class="card mb-4 border-warning">
@@ -63,7 +65,11 @@
                     {% for comp in competencies %}
                     <tr>
                         <td>Competency</td>
-                        <td>{{ comp.competency.name }}</td>
+                        <td>
+                            <strong>{{ comp.competency.name }}</strong>
+                            <div><span class="badge bg-primary-subtle text-primary">{{ comp.competency.get_competency_type_display }}</span></div>
+                            <div class="text-muted mt-1">{% include 'appraisal/_competency_description.html' with competency=comp.competency %}</div>
+                        </td>
                         <td>{{ comp.end_year_score|default:"N/A" }}</td>
                     </tr>
                     {% endfor %}

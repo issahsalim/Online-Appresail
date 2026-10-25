@@ -1,7 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import update_session_auth_hash
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
+from django.urls import reverse
 from django.http import JsonResponse
 from django.utils import timezone
 from django.contrib import messages
@@ -15,7 +18,9 @@ from .models import (
     EmployeeProfile,
 )
 from .forms import (
+    AppraisalEmployeeInfoForm,
     AppraisalReturnForm,
+    AppraisalTrainingFormSet,
     EmployeeCompetencySelectionForm,
     HODCommentForm,
     HRCommentForm,
@@ -82,7 +87,23 @@ def fill_targets(request):
 
         formset = TargetFormSet(request.POST, instance=appraisal)
         competency_form = EmployeeCompetencySelectionForm(request.POST)
-        if formset.is_valid() and competency_form.is_valid():
+        employee_info_form = AppraisalEmployeeInfoForm(
+            request.POST,
+            instance=appraisal,
+            profile=profile,
+            prefix='employee_info',
+        )
+        training_formset = AppraisalTrainingFormSet(
+            request.POST,
+            instance=appraisal,
+            prefix='trainings',
+        )
+        if (
+            formset.is_valid()
+            and competency_form.is_valid()
+            and employee_info_form.is_valid()
+            and training_formset.is_valid()
+        ):
             selected_competencies = competency_form.cleaned_data['competencies']
             submit_for_review = request.POST.get('action') == 'submit'
             assignment = None
@@ -101,7 +122,9 @@ def fill_targets(request):
 
             if not submit_for_review or (selected_competencies and assignment):
                 with transaction.atomic():
+                    employee_info_form.save()
                     formset.save()
+                    training_formset.save()
                     selected_ids = list(selected_competencies.values_list('id', flat=True))
                     appraisal.competency_scores.exclude(
                         competency_id__in=selected_ids,
@@ -126,6 +149,15 @@ def fill_targets(request):
                 return redirect('employee_dashboard')
     else:
         formset = TargetFormSet(instance=appraisal)
+        employee_info_form = AppraisalEmployeeInfoForm(
+            instance=appraisal,
+            profile=profile,
+            prefix='employee_info',
+        )
+        training_formset = AppraisalTrainingFormSet(
+            instance=appraisal,
+            prefix='trainings',
+        )
         competency_form = EmployeeCompetencySelectionForm(
             initial={
                 'competencies': appraisal.competency_scores.values_list(
@@ -147,9 +179,17 @@ def fill_targets(request):
                     ),
                 }
             )
+        selected_competency_ids = {
+            str(competency_id)
+            for competency_id in (competency_form['competencies'].value() or [])
+        }
         return render(request, 'employee/fill_targets.html', {
             'formset': formset,
+            'employee_info_form': employee_info_form,
+            'training_formset': training_formset,
             'competency_form': competency_form,
+            'available_competencies': competency_form.fields['competencies'].queryset,
+            'selected_competency_ids': selected_competency_ids,
             'appraisal': appraisal,
             'read_only': False,
             'return_history': appraisal.returns.select_related('reviewer'),
@@ -158,6 +198,7 @@ def fill_targets(request):
     return render(request, 'employee/fill_targets.html', {
         'appraisal': appraisal,
         'read_only': True,
+        'trainings': appraisal.trainings.all(),
         'targets': appraisal.targets.all(),
         'competencies': appraisal.competency_scores.select_related('competency'),
         'return_history': appraisal.returns.select_related('reviewer'),
@@ -166,14 +207,19 @@ def fill_targets(request):
 
 @login_required
 def profile(request):
+    employee_profile = request.user.profile
     if request.method == 'POST':
-        form = UserProfileForm(request.POST, instance=request.user)
+        form = UserProfileForm(
+            request.POST,
+            instance=request.user,
+            profile=employee_profile,
+        )
         if form.is_valid():
             form.save()
             messages.success(request, "Your profile has been updated.")
             return redirect('profile')
     else:
-        form = UserProfileForm(instance=request.user)
+        form = UserProfileForm(instance=request.user, profile=employee_profile)
 
     return render(request, 'account/profile.html', {'form': form})
 
@@ -257,11 +303,14 @@ def supervisor_dashboard(request):
         messages.error(request, "No active appraisal cycle.")
         return redirect('login')
 
-    # 1. Get the supervisor's OWN appraisal (They are an employee too!)
-    my_appraisal, created = Appraisal.objects.get_or_create(
-        employee=profile,
-        cycle=cycle
-    )
+    # A supervisor only has an own appraisal when they are assigned to a supervisor.
+    has_supervisor = AssignSupervisor.objects.filter(employee=profile).exists()
+    my_appraisal = None
+    if has_supervisor:
+        my_appraisal, created = Appraisal.objects.get_or_create(
+            employee=profile,
+            cycle=cycle
+        )
 
     # 2. Get the team's appraisals waiting for review
     pending_reviews = Appraisal.objects.filter(
@@ -278,6 +327,7 @@ def supervisor_dashboard(request):
 
     context = {
         'my_appraisal': my_appraisal,
+        'has_supervisor': has_supervisor,
         'pending_reviews': pending_reviews,
         'assigned_employees': assigned_employees,
         'assigned_appraisals': assigned_appraisals,
@@ -385,6 +435,7 @@ def supervisor_review(request, appraisal_id):
         'appraisal': appraisal,
         'target_formset': target_formset,
         'comp_formset': comp_formset,
+        'trainings': appraisal.trainings.all(),
         'return_form': AppraisalReturnForm(),
         'return_history': appraisal.returns.select_related('reviewer'),
     })
@@ -547,6 +598,7 @@ def hod_review(request, appraisal_id):
         'form': form,
         'targets': targets,
         'competencies': competencies,
+        'trainings': appraisal.trainings.all(),
         'return_form': AppraisalReturnForm(),
         'return_history': appraisal.returns.select_related('reviewer'),
     })
@@ -563,12 +615,166 @@ def hr_dashboard(request):
         messages.error(request, "Access denied. You are not an HR Manager.")
         return redirect('dashboard_router')
 
+    users = EmployeeProfile.objects.filter(
+        role__in=['Employee', 'Supervisor', 'HOD']
+    ).select_related('user').order_by('user__username')
+    role_choices = [
+        choice for choice in EmployeeProfile.ROLE_CHOICES
+        if choice[0] != 'HR'
+    ]
+
+    if request.method == 'POST':
+        submitted_roles = {}
+        allowed_profile_ids = {str(user.id) for user in users}
+        for key, role in request.POST.items():
+            if not key.startswith('role_'):
+                continue
+            profile_id = key.removeprefix('role_')
+            if profile_id not in allowed_profile_ids or role not in dict(role_choices):
+                messages.error(request, "Choose a valid user and role.")
+                return redirect('hr_dashboard')
+            submitted_roles[profile_id] = role
+
+        if not submitted_roles:
+            messages.error(request, "No user roles were submitted.")
+            return redirect('hr_dashboard')
+
+        changed_count = 0
+        with transaction.atomic():
+            for user_profile in users:
+                new_role = submitted_roles.get(str(user_profile.id))
+                if new_role and user_profile.role != new_role:
+                    user_profile.role = new_role
+                    user_profile.save(update_fields=['role'])
+                    changed_count += 1
+
+        if changed_count:
+            messages.success(request, f"Updated {changed_count} user role(s).")
+        else:
+            messages.info(request, "No user roles needed updating.")
+        return redirect('hr_dashboard')
+
     # Get all appraisals that the HOD has pushed to HR
     pending_reviews = Appraisal.objects.filter(
         status='pending_hr'
     ).select_related('employee__user', 'supervisor__user', 'hod__user', 'cycle')
 
-    return render(request, 'hr/dashboard.html', {'pending_reviews': pending_reviews})
+    return render(request, 'hr/dashboard.html', {
+        'pending_reviews': pending_reviews,
+        'departments': Department.objects.order_by('name'),
+        'cycles': AppraisalCycle.objects.order_by('-year'),
+        'users': users,
+        'role_choices': role_choices,
+    })
+
+
+@login_required
+def hr_search_completed_appraisals(request):
+    if request.user.profile.role != 'HR':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    query = request.GET.get('q', '').strip()[:100]
+    department_id = request.GET.get('department', '').strip()
+    cycle_year = request.GET.get('cycle_year', '').strip()
+    appraisals = Appraisal.objects.filter(status='completed').select_related(
+        'employee__user',
+        'employee__department',
+        'supervisor__user',
+        'hod__user',
+        'cycle',
+    )
+
+    if department_id:
+        try:
+            department_id = int(department_id)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid department filter.'}, status=400)
+        department = get_object_or_404(Department, pk=department_id)
+        appraisals = appraisals.filter(employee_department_id=department_id)
+
+    if cycle_year:
+        try:
+            cycle_year = int(cycle_year)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid cycle year filter.'}, status=400)
+        appraisals = appraisals.filter(cycle__year=cycle_year)
+
+    if query:
+        appraisals = appraisals.filter(
+            Q(employee__user__username__icontains=query)
+            | Q(employee__user__first_name__icontains=query)
+            | Q(employee__user__last_name__icontains=query)
+            | Q(employee__user__email__icontains=query)
+            | Q(employee_department__name__icontains=query)
+            | Q(employee_department_name__icontains=query)
+            | Q(supervisor__user__username__icontains=query)
+            | Q(supervisor__user__first_name__icontains=query)
+            | Q(supervisor__user__last_name__icontains=query)
+            | Q(hod__user__username__icontains=query)
+            | Q(hod__user__first_name__icontains=query)
+            | Q(hod__user__last_name__icontains=query)
+            | Q(cycle__year__icontains=query)
+            | Q(final_rating__icontains=query)
+        )
+
+    paginator = Paginator(
+        appraisals.order_by('-cycle__year', 'employee__user__username'),
+        25,
+    )
+    page = paginator.get_page(request.GET.get('page', 1))
+    results = []
+    for appraisal in page.object_list:
+        results.append({
+            'id': appraisal.id,
+            'employee_staff_id': appraisal.employee.user.username,
+            'employee_name': appraisal.employee.user.get_full_name()
+            or appraisal.employee.user.username,
+            'department': appraisal.employee_department_name
+            or (appraisal.employee_department.name if appraisal.employee_department else '—'),
+            'supervisor': appraisal.supervisor.user.username
+            if appraisal.supervisor else '—',
+            'hod': appraisal.hod.user.username if appraisal.hod else '—',
+            'cycle_year': appraisal.cycle.year,
+            'overall_percentage': str(appraisal.overall_percentage)
+            if appraisal.overall_percentage is not None else '—',
+            'final_rating': appraisal.final_rating or '—',
+            'view_url': reverse('hr_completed_appraisal', args=[appraisal.id]),
+        })
+
+    return JsonResponse({
+        'results': results,
+        'page': page.number,
+        'pages': paginator.num_pages,
+        'total': paginator.count,
+        'has_previous': page.has_previous(),
+        'has_next': page.has_next(),
+    })
+
+
+@login_required
+def hr_completed_appraisal(request, appraisal_id):
+    if request.user.profile.role != 'HR':
+        messages.error(request, "Access denied. You are not an HR Manager.")
+        return redirect('dashboard_router')
+
+    appraisal = get_object_or_404(
+        Appraisal.objects.select_related(
+            'employee__user',
+            'employee__department',
+            'supervisor__user',
+            'hod__user',
+            'cycle',
+        ),
+        pk=appraisal_id,
+        status='completed',
+    )
+    return render(request, 'hr/completed_appraisal.html', {
+        'appraisal': appraisal,
+        'targets': appraisal.targets.all(),
+        'competencies': appraisal.competency_scores.select_related('competency'),
+        'trainings': appraisal.trainings.all(),
+        'return_history': appraisal.returns.select_related('reviewer'),
+    })
 
 
 @login_required
@@ -618,14 +824,73 @@ def hr_supervisor_assignments(request):
                 }
         form = HRSupervisorAssignmentForm(initial=initial)
 
+    return render(request, 'hr/supervisor_assignments.html', {
+        'form': form,
+        'departments': Department.objects.order_by('name'),
+    })
+
+
+@login_required
+def hr_search_supervisor_assignments(request):
+    if request.user.profile.role != 'HR':
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+
+    query = request.GET.get('q', '').strip()[:100]
+    department_id = request.GET.get('department', '').strip()
     assignments = AssignSupervisor.objects.select_related(
         'department',
         'employee__user',
         'supervisor__user',
-    ).order_by('department__name', 'employee__user__username')
-    return render(request, 'hr/supervisor_assignments.html', {
-        'form': form,
-        'assignments': assignments,
+    )
+
+    if department_id:
+        try:
+            department_id = int(department_id)
+        except ValueError:
+            return JsonResponse({'error': 'Invalid department filter.'}, status=400)
+        assignments = assignments.filter(department_id=department_id)
+
+    if query:
+        assignments = assignments.filter(
+            Q(employee__user__username__icontains=query)
+            | Q(employee__user__first_name__icontains=query)
+            | Q(employee__user__last_name__icontains=query)
+            | Q(employee__user__email__icontains=query)
+            | Q(supervisor__user__username__icontains=query)
+            | Q(supervisor__user__first_name__icontains=query)
+            | Q(supervisor__user__last_name__icontains=query)
+            | Q(department__name__icontains=query)
+        )
+
+    paginator = Paginator(
+        assignments.order_by('department__name', 'employee__user__username'),
+        25,
+    )
+    page = paginator.get_page(request.GET.get('page', 1))
+    results = []
+    for assignment in page.object_list:
+        employee = assignment.employee
+        supervisor = assignment.supervisor
+        results.append({
+            'department': assignment.department.name,
+            'employee_id': employee.id,
+            'employee_staff_id': employee.user.username,
+            'employee_name': employee.user.get_full_name() or employee.user.username,
+            'supervisor_staff_id': supervisor.user.username,
+            'supervisor_name': supervisor.user.get_full_name() or supervisor.user.username,
+            'edit_url': (
+                f"{reverse('hr_supervisor_assignments')}?"
+                f"department={assignment.department_id}&employee={employee.id}"
+            ),
+        })
+
+    return JsonResponse({
+        'results': results,
+        'page': page.number,
+        'pages': paginator.num_pages,
+        'total': paginator.count,
+        'has_previous': page.has_previous(),
+        'has_next': page.has_next(),
     })
 
 
@@ -635,11 +900,16 @@ def hr_assignment_options(request):
         return JsonResponse({'error': 'Forbidden'}, status=403)
 
     department_id = request.GET.get('department_id')
-    if not department_id or not Department.objects.filter(pk=department_id).exists():
+    try:
+        department_id = int(department_id)
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Select a valid department.'}, status=400)
+
+    if not Department.objects.filter(pk=department_id).exists():
         return JsonResponse({'error': 'Select a valid department.'}, status=400)
 
     employees = EmployeeProfile.objects.filter(
-        role='Employee',
+        role__in=['Employee', 'Supervisor'],
         department_id=department_id,
     ).select_related('user').order_by('user__username')
     supervisors = EmployeeProfile.objects.filter(
@@ -710,6 +980,31 @@ def hr_approve(request, appraisal_id):
         'form': form,
         'targets': targets,
         'competencies': competencies,
+        'trainings': appraisal.trainings.all(),
         'return_form': AppraisalReturnForm(),
         'return_history': appraisal.returns.select_related('reviewer'),
     })
+
+
+def changer_user_role(request):
+    if request.method == 'POST':
+        user_id = request.POST.get('user_id')
+        new_role = request.POST.get('new_role')
+
+        if not user_id or not new_role:
+            return JsonResponse({'error': 'Missing user_id or new_role.'}, status=400)
+
+        try:
+            user_profile = EmployeeProfile.objects.get(pk=user_id)
+        except EmployeeProfile.DoesNotExist:
+            return JsonResponse({'error': 'User not found.'}, status=404)
+
+        if new_role not in dict(EmployeeProfile.ROLE_CHOICES):
+            return JsonResponse({'error': 'Invalid role.'}, status=400)
+
+        user_profile.role = new_role
+        user_profile.save()
+
+        return JsonResponse({'success': True, 'new_role': new_role})
+
+    return JsonResponse({'error': 'Invalid request method.'}, status=405) 

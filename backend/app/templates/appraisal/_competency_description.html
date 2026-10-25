@@ -1,0 +1,9 @@
+{% if competency.description_items %}
+    <ul class="mb-0 ps-3">
+        {% for item in competency.description_items %}
+            <li>{{ item }}</li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <span class="text-muted">No description provided.</span>
+{% endif %}

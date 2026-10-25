@@ -3,6 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from .models import (
     Appraisal,
+    AppraisalTraining,
     AppraisalTarget,
     AppraisalCompetencyScore,
     Competency,
@@ -12,22 +13,201 @@ from .models import (
 
 
 class UserProfileForm(forms.ModelForm):
+    title = forms.ChoiceField(
+        choices=[('', 'Select title')] + EmployeeProfile.TITLE_CHOICES,
+        required=False,
+    )
+    other_title = forms.CharField(required=False, max_length=50)
+    other_names = forms.CharField(required=False, max_length=150)
+    gender = forms.ChoiceField(
+        choices=[('', 'Select gender')] + EmployeeProfile.GENDER_CHOICES,
+        required=False,
+    )
+    job_title = forms.CharField(required=False, max_length=150)
+    appointment_to_present_grade_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+
     class Meta:
         model = get_user_model()
         fields = ['first_name', 'last_name', 'email']
+        labels = {
+            'first_name': 'First name',
+            'last_name': 'Surname',
+            'email': 'Email address',
+        }
+
+    def __init__(self, *args, profile=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.profile = profile
+        self.fields['title'].label = 'Title'
+        self.fields['other_title'].label = 'Other title (specify)'
+        self.fields['other_names'].label = 'Other name(s)'
+        self.fields['gender'].label = 'Gender'
+        self.fields['job_title'].label = 'Present job title/position'
+        self.fields['appointment_to_present_grade_date'].label = (
+            'Date of appointment to present grade'
+        )
+        if profile:
+            for field in (
+                'title',
+                'other_title',
+                'other_names',
+                'gender',
+                'job_title',
+                'appointment_to_present_grade_date',
+            ):
+                self.fields[field].initial = getattr(profile, field)
+
+    def save(self, commit=True):
+        user = super().save(commit=commit)
+        if commit and self.profile:
+            for field in (
+                'title',
+                'other_title',
+                'other_names',
+                'gender',
+                'job_title',
+                'appointment_to_present_grade_date',
+            ):
+                setattr(self.profile, field, self.cleaned_data[field])
+            self.profile.save(update_fields=[
+                'title',
+                'other_title',
+                'other_names',
+                'gender',
+                'job_title',
+                'appointment_to_present_grade_date',
+            ])
+        return user
+
+
+class AppraisalEmployeeInfoForm(forms.ModelForm):
+    class Meta:
+        model = Appraisal
+        fields = [
+            'employee_title',
+            'employee_other_title',
+            'employee_first_name',
+            'employee_last_name',
+            'employee_other_names',
+            'employee_gender',
+            'employee_job_title',
+            'employee_department',
+            'employee_appointment_to_present_grade_date',
+        ]
+        labels = {
+            'employee_title': 'Title',
+            'employee_other_title': 'Other title (specify)',
+            'employee_first_name': 'First name',
+            'employee_last_name': 'Surname',
+            'employee_other_names': 'Other name(s)',
+            'employee_gender': 'Gender',
+            'employee_job_title': 'Present job title/position',
+            'employee_department': 'Department / unit',
+            'employee_appointment_to_present_grade_date':
+                'Date of appointment to present grade',
+        }
+        widgets = {
+            'employee_appointment_to_present_grade_date': forms.DateInput(
+                attrs={'type': 'date'},
+            ),
+        }
+
+    def __init__(self, *args, profile=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['employee_title'].required = False
+        self.fields['employee_gender'].required = False
+        self.fields['employee_other_title'].required = False
+        self.fields['employee_first_name'].required = False
+        self.fields['employee_last_name'].required = False
+        self.fields['employee_other_names'].required = False
+        self.fields['employee_job_title'].required = False
+        self.fields['employee_department'].required = False
+        self.fields['employee_appointment_to_present_grade_date'].required = False
+        self.fields['employee_department'].queryset = Department.objects.order_by('name')
+        profile_values = {}
+        if profile:
+            profile_values = {
+                'employee_title': profile.title,
+                'employee_other_title': profile.other_title,
+                'employee_first_name': profile.user.first_name,
+                'employee_last_name': profile.user.last_name,
+                'employee_other_names': profile.other_names,
+                'employee_gender': profile.gender,
+                'employee_job_title': profile.job_title,
+                'employee_department': profile.department,
+                'employee_appointment_to_present_grade_date':
+                    profile.appointment_to_present_grade_date,
+            }
+
+        for field_name in self.fields:
+            field = self.fields[field_name]
+            instance_value = getattr(self.instance, field_name)
+            if field_name == 'employee_department':
+                has_appraisal_value = bool(
+                    self.instance.employee_department_id
+                    or self.instance.employee_department_name
+                )
+                profile_value = profile_values.get(field_name)
+                initial_value = (
+                    self.instance.employee_department
+                    if self.instance.employee_department_id
+                    else profile_value if not has_appraisal_value else None
+                )
+            else:
+                has_appraisal_value = bool(instance_value)
+                profile_value = profile_values.get(field_name)
+                initial_value = instance_value or profile_value
+
+            if initial_value not in (None, ''):
+                self.initial[field_name] = initial_value
+            if has_appraisal_value or profile_value not in (None, ''):
+                field.disabled = True
+
+    def save(self, commit=True):
+        appraisal = super().save(commit=commit)
+        if commit and appraisal.employee_department_id:
+            appraisal.employee_department_name = appraisal.employee_department.name
+            appraisal.save(update_fields=['employee_department_name'])
+        return appraisal
+
+
+class AppraisalTrainingForm(forms.ModelForm):
+    class Meta:
+        model = AppraisalTraining
+        fields = ['institution', 'date', 'programme']
+        widgets = {'date': forms.DateInput(attrs={'type': 'date'})}
+
+
+AppraisalTrainingFormSet = forms.inlineformset_factory(
+    Appraisal,
+    AppraisalTraining,
+    form=AppraisalTrainingForm,
+    extra=4,
+    max_num=4,
+    can_delete=False,
+)
 
 
 class HRSupervisorAssignmentForm(forms.Form):
     department = forms.ModelChoiceField(queryset=Department.objects.order_by('name'))
-    employee = forms.ModelChoiceField(queryset=EmployeeProfile.objects.none())
-    supervisor = forms.ModelChoiceField(queryset=EmployeeProfile.objects.none())
+    employee = forms.ModelChoiceField(
+        queryset=EmployeeProfile.objects.none(),
+        error_messages={'invalid_choice': "Choose an employee from the selected department."},
+    )
+    supervisor = forms.ModelChoiceField(
+        queryset=EmployeeProfile.objects.none(),
+        error_messages={'invalid_choice': "Choose a supervisor from the selected department."},
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         department_id = self.data.get('department') or self.initial.get('department')
         if department_id:
             self.fields['employee'].queryset = EmployeeProfile.objects.filter(
-                role='Employee',
+                role__in=['Employee', 'Supervisor'],
                 department_id=department_id,
             ).select_related('user').order_by('user__username')
             self.fields['supervisor'].queryset = EmployeeProfile.objects.filter(
@@ -45,6 +225,8 @@ class HRSupervisorAssignmentForm(forms.Form):
             self.add_error('employee', "Choose an employee from the selected department.")
         if department and supervisor and supervisor.department_id != department.id:
             self.add_error('supervisor', "Choose a supervisor from the selected department.")
+        if employee and supervisor and employee == supervisor:
+            self.add_error('supervisor', "A supervisor cannot be assigned to themselves.")
 
         return cleaned_data
 

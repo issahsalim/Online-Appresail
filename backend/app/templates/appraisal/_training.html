@@ -1,0 +1,19 @@
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">Training Received During the Year Under Review</div>
+    <div class="card-body table-responsive">
+        <table class="table table-bordered mb-0">
+            <thead><tr><th>Institution</th><th>Date</th><th>Programme</th></tr></thead>
+            <tbody>
+                {% for training in trainings %}
+                    <tr>
+                        <td>{{ training.institution|default:"—" }}</td>
+                        <td>{{ training.date|date:"d/m/Y"|default:"—" }}</td>
+                        <td>{{ training.programme|default:"—" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3" class="text-center">No training recorded for this appraisal period.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

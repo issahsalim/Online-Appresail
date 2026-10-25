@@ -1,0 +1,17 @@
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">Section 1: Employee Information</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4"><strong>Title:</strong> {{ appraisal.get_employee_title_display|default:appraisal.employee.get_title_display|default:"—" }}{% if appraisal.employee_other_title or appraisal.employee.other_title %} ({{ appraisal.employee_other_title|default:appraisal.employee.other_title }}){% endif %}</div>
+            <div class="col-md-4"><strong>Surname:</strong> {{ appraisal.employee_last_name|default:appraisal.employee.user.last_name|default:"—" }}</div>
+            <div class="col-md-4"><strong>First name:</strong> {{ appraisal.employee_first_name|default:appraisal.employee.user.first_name|default:"—" }}</div>
+            <div class="col-md-4"><strong>Other name(s):</strong> {{ appraisal.employee_other_names|default:appraisal.employee.other_names|default:"—" }}</div>
+            <div class="col-md-4"><strong>Gender:</strong> {{ appraisal.get_employee_gender_display|default:appraisal.employee.get_gender_display|default:"—" }}</div>
+            <div class="col-md-4"><strong>Staff ID:</strong> {{ appraisal.employee.user.username }}</div>
+            <div class="col-md-6"><strong>Present job title/position:</strong> {{ appraisal.employee_job_title|default:appraisal.employee.job_title|default:"—" }}</div>
+            <div class="col-md-6"><strong>Department / unit:</strong> {% if appraisal.employee_department_name %}{{ appraisal.employee_department_name }}{% elif appraisal.employee_department %}{{ appraisal.employee_department.name }}{% elif appraisal.employee.department %}{{ appraisal.employee.department.name }}{% else %}—{% endif %}</div>
+            <div class="col-md-6"><strong>Date of appointment to present grade:</strong> {{ appraisal.employee_appointment_to_present_grade_date|default:appraisal.employee.appointment_to_present_grade_date|date:"d/m/Y"|default:"—" }}</div>
+            <div class="col-md-6"><strong>Period of report:</strong> {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"—" }} to {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"—" }}</div>
+        </div>
+    </div>
+</div>

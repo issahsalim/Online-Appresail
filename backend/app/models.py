@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -23,11 +24,28 @@ class EmployeeProfile(models.Model):
         ('HOD', 'Head of Department'),
         ('HR', 'HR Manager'),
     ]
+    TITLE_CHOICES = [
+        ('mr', 'Mr.'),
+        ('mrs', 'Mrs.'),
+        ('ms', 'Ms.'),
+        ('other', 'Other'),
+    ]
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    ]
     
     # Using the User model (Staff ID should be saved in user.username)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='Employee')
+    title = models.CharField(max_length=10, choices=TITLE_CHOICES, blank=True)
+    other_title = models.CharField(max_length=50, blank=True)
+    other_names = models.CharField(max_length=150, blank=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
+    job_title = models.CharField(max_length=150, blank=True)
+    appointment_to_present_grade_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         dept = self.department.name if self.department else 'No Dept'
@@ -41,7 +59,7 @@ class AssignSupervisor(models.Model):
         EmployeeProfile, 
         on_delete=models.CASCADE, 
         related_name='employee_supervisor', 
-        limit_choices_to={'role': 'Employee'}
+        limit_choices_to={'role__in': ['Employee', 'Supervisor']}
     )
     supervisor = models.ForeignKey(
         EmployeeProfile, 
@@ -72,9 +90,21 @@ class AssignDepartmentHod(models.Model):
 class AppraisalCycle(models.Model):
     year = models.IntegerField(unique=True)
     is_active = models.BooleanField(default=True)
+    report_period_from = models.DateField(null=True, blank=True)
+    report_period_to = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"Cycle {self.year}"
+
+    def clean(self):
+        if (
+            self.report_period_from
+            and self.report_period_to
+            and self.report_period_to < self.report_period_from
+        ):
+            raise ValidationError({
+                'report_period_to': 'The report period end date must be on or after its start date.',
+            })
 
 
 class Competency(models.Model):
@@ -82,10 +112,21 @@ class Competency(models.Model):
     
     name = models.CharField(max_length=255)
     competency_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    description = models.TextField(blank=True)
+    description = models.TextField(
+        blank=True,
+        help_text='Enter each description item on a separate line.',
+    )
 
     def __str__(self):
         return f"[{self.get_competency_type_display()}] {self.name}"
+
+    @property
+    def description_items(self):
+        return [
+            item.strip().lstrip('-* ').strip()
+            for item in self.description.splitlines()
+            if item.strip()
+        ]
 
 
 # ==========================================
@@ -106,6 +147,22 @@ class Appraisal(models.Model):
 
     cycle = models.ForeignKey(AppraisalCycle, on_delete=models.CASCADE, related_name="appraisals")
     employee = models.ForeignKey(EmployeeProfile, on_delete=models.CASCADE, related_name="my_appraisals")
+    employee_title = models.CharField(max_length=10, choices=EmployeeProfile.TITLE_CHOICES, blank=True)
+    employee_other_title = models.CharField(max_length=50, blank=True)
+    employee_first_name = models.CharField(max_length=150, blank=True)
+    employee_last_name = models.CharField(max_length=150, blank=True)
+    employee_other_names = models.CharField(max_length=150, blank=True)
+    employee_gender = models.CharField(max_length=10, choices=EmployeeProfile.GENDER_CHOICES, blank=True)
+    employee_job_title = models.CharField(max_length=150, blank=True)
+    employee_department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='appraisals',
+    )
+    employee_department_name = models.CharField(max_length=100, blank=True)
+    employee_appointment_to_present_grade_date = models.DateField(null=True, blank=True)
     
     # People in the flow
     supervisor = models.ForeignKey(EmployeeProfile, on_delete=models.SET_NULL, null=True, blank=True, related_name="supervisor_appraisals")
@@ -194,6 +251,20 @@ class AppraisalReturn(models.Model):
 
     def __str__(self):
         return f"{self.appraisal} returned by {self.reviewer_name} ({self.stage})"
+
+
+class AppraisalTraining(models.Model):
+    appraisal = models.ForeignKey(
+        Appraisal,
+        on_delete=models.CASCADE,
+        related_name='trainings',
+    )
+    institution = models.CharField(max_length=200, blank=True)
+    date = models.DateField(null=True, blank=True)
+    programme = models.CharField(max_length=200, blank=True)
+
+    def __str__(self):
+        return f"{self.appraisal} — {self.programme or self.institution or 'Training'}"
 
 
 # ==========================================
