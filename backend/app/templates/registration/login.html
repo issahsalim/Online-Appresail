@@ -1,21 +1,373 @@
-<!-- templates/registration/login.html -->
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Staff Sign In | Mathias Catholic Hospital, Yeji{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header bg-dark text-white text-center">
-                <h4>System Login</h4>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" class="btn btn-primary w-100 mt-3">Login</button>
-                </form>
-            </div>
+<style>
+    body { background: #f4f8fa; }
+    body:has(.login-page) {
+        background: #f4f8fa;
+    }
+    body:has(.login-page) > nav {
+        display: none;
+    }
+    body:has(.login-page) > .container {
+        max-width: none;
+        padding: 0;
+        width: 100%;
+    }
+    body:has(.login-page) > .container > .alert {
+        left: 50%;
+        max-width: 560px;
+        position: fixed;
+        top: 1rem;
+        transform: translateX(-50%);
+        width: calc(100% - 2rem);
+        z-index: 10;
+    }
+    .login-page {
+        --login-navy: #092b46;
+        --login-teal: #16b8a6;
+        align-items: stretch;
+        background: #fff;
+        display: grid;
+        grid-template-columns: minmax(0, 1.05fr) minmax(440px, .95fr);
+        height: 100vh;
+        min-height: 100vh;
+        overflow: hidden;
+    }
+    .login-visual {
+        background:
+            linear-gradient(160deg, rgba(5, 31, 54, .28), rgba(5, 31, 54, .82)),
+            url("{% static 'images/loginimg.webp' %}") center 42% / cover;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 0;
+        overflow: hidden;
+        padding: clamp(2rem, 5vw, 4.5rem);
+        position: relative;
+    }
+    .login-visual::after {
+        background: radial-gradient(ellipse at 15% 100%, rgba(22, 184, 166, .35), transparent 48%);
+        content: "";
+        inset: 0;
+        pointer-events: none;
+        position: absolute;
+        z-index: 0;
+    }
+    .login-brand,
+    .login-message,
+    .login-photo-credit {
+        position: relative;
+        z-index: 2;
+    }
+    .login-brand {
+        align-items: center;
+        color: #fff;
+        display: inline-flex;
+        font-size: .95rem;
+        font-weight: 750;
+        gap: .8rem;
+        width: fit-content;
+    }
+    .login-brand-mark {
+        align-items: center;
+        background: var(--login-teal);
+        border-radius: 13px;
+        color: var(--login-navy);
+        display: inline-flex;
+        font-size: 1.2rem;
+        height: 44px;
+        justify-content: center;
+        width: 44px;
+    }
+    .login-message {
+        margin: auto 0;
+        max-width: 610px;
+        padding: 5rem clamp(3rem, 4vw, 4rem) 5rem 0;
+    }
+    .login-kicker {
+        align-items: center;
+        color: #9df1e5;
+        display: flex;
+        font-size: .75rem;
+        font-weight: 800;
+        gap: .65rem;
+        letter-spacing: .17em;
+        text-transform: uppercase;
+    }
+    .login-kicker::before {
+        background: var(--login-teal);
+        border-radius: 4px;
+        content: "";
+        height: 3px;
+        width: 28px;
+    }
+    .login-message h1 {
+        font-size: clamp(2.5rem, 4.2vw, 4rem);
+        font-weight: 780;
+        letter-spacing: -.055em;
+        line-height: 1.04;
+        margin: 1.25rem 0;
+        max-width: 580px;
+    }
+    .login-message p {
+        color: rgba(255,255,255,.84);
+        font-size: 1.08rem;
+        line-height: 1.75;
+        margin: 0;
+        max-width: 470px;
+    }
+    .login-photo-credit { color: rgba(255,255,255,.72); font-size: .8rem; }
+    .login-panel {
+        align-items: center;
+        background:
+            radial-gradient(circle at 100% 0%, rgba(22, 184, 166, .08), transparent 30%),
+            #fff;
+        display: flex;
+        justify-content: center;
+        padding: clamp(2rem, 6vw, 6rem);
+        position: relative;
+    }
+    .login-panel::before {
+        background: #fff;
+        border-radius: 50%;
+        content: "";
+        height: 112%;
+        left: -48px;
+        position: absolute;
+        top: -6%;
+        width: 96px;
+        z-index: 1;
+    }
+    .login-form-wrap { max-width: 430px; position: relative; width: 100%; z-index: 2; }
+    .login-form-wrap h2 {
+        color: var(--login-navy);
+        font-size: clamp(2rem, 4vw, 2.65rem);
+        font-weight: 780;
+        letter-spacing: -.045em;
+        margin: 0 0 .7rem;
+    }
+    .login-intro { color: #687c88; line-height: 1.7; margin-bottom: 2rem; }
+    .login-error {
+        background: #fff1f0;
+        border: 1px solid #ffd4d0;
+        border-radius: 12px;
+        color: #a62d25;
+        font-size: .9rem;
+        margin-bottom: 1.25rem;
+        padding: .85rem 1rem;
+    }
+    .login-field { margin-bottom: 1.2rem; }
+    .login-field label {
+        color: #183a4d;
+        display: block;
+        font-size: .88rem;
+        font-weight: 700;
+        margin-bottom: .5rem;
+    }
+    .login-field input {
+        background: #fbfdfe;
+        border: 1px solid #d7e2e7;
+        border-radius: 12px;
+        color: #17374a;
+        min-height: 54px;
+        padding: .85rem 1rem;
+        transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+        width: 100%;
+    }
+    .login-field input:focus {
+        background: #fff;
+        border-color: var(--login-teal);
+        box-shadow: 0 0 0 4px rgba(22, 184, 166, .14);
+        outline: 0;
+    }
+    .password-input-wrap { position: relative; }
+    .password-input-wrap input { padding-right: 5rem; }
+    .password-toggle {
+        background: transparent;
+        border: 0;
+        border-radius: 7px;
+        color: #087b74;
+        font-size: .82rem;
+        font-weight: 750;
+        padding: .4rem .55rem;
+        position: absolute;
+        right: .65rem;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .password-toggle:hover { background: #e9f8f5; }
+    .password-toggle:focus-visible { outline: 2px solid #16b8a6; outline-offset: 2px; }
+    .login-field .field-error { color: #b42318; font-size: .82rem; margin-top: .4rem; }
+    .login-submit {
+        align-items: center;
+        background: var(--login-navy);
+        border: 0;
+        border-radius: 12px;
+        color: #fff;
+        display: flex;
+        font-weight: 750;
+        justify-content: center;
+        margin-top: .5rem;
+        min-height: 56px;
+        transition: background .2s ease, box-shadow .2s ease, transform .2s ease;
+        width: 100%;
+    }
+    .login-submit:hover {
+        background: #104466;
+        box-shadow: 0 12px 24px rgba(9, 43, 70, .18);
+        color: #fff;
+        transform: translateY(-1px);
+    }
+    .login-security {
+        align-items: center;
+        color: #73858e;
+        display: flex;
+        font-size: .82rem;
+        gap: .55rem;
+        justify-content: center;
+        margin-top: 1.35rem;
+    }
+    .login-security span { color: #138d80; font-size: 1rem; }
+    .login-footer {
+        border-top: 1px solid #edf1f3;
+        color: #86959c;
+        font-size: .78rem;
+        line-height: 1.6;
+        margin-top: 3rem;
+        padding-top: 1.2rem;
+        text-align: center;
+    }
+    @media (max-width: 900px) {
+        .login-page { grid-template-columns: minmax(0, .9fr) minmax(380px, 1.1fr); }
+        .login-visual { padding: 2.5rem; }
+        .login-panel { padding: 3rem 2rem; }
+    }
+    @media (max-width: 700px) {
+        .login-page { display: flex; flex-direction: column; height: auto; overflow: hidden; }
+        .login-visual {
+            background-position: center 37%;
+            min-height: 360px;
+            padding: 1.5rem;
+        }
+        .login-panel::before {
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            height: 70px;
+            left: -5%;
+            top: -35px;
+            width: 110%;
+        }
+        .login-message { margin: auto 0; padding: 3.5rem 0 2rem; }
+        .login-message h1 { font-size: clamp(2.1rem, 10vw, 3.2rem); max-width: 450px; }
+        .login-message p { font-size: .98rem; max-width: 430px; }
+        .login-photo-credit { display: none; }
+        .login-panel { flex: 1; padding: 2.5rem 1.5rem 3rem; }
+        .login-footer { margin-top: 2rem; }
+    }
+    @media (min-width: 701px) and (max-height: 700px) {
+        .login-page { height: auto; min-height: 700px; }
+        .login-visual { min-height: 700px; }
+    }
+</style>
+
+<main class="login-page">
+    <section class="login-visual" aria-label="Mathias Catholic Hospital care team">
+        <!-- <a class="login-brand" href="{% url 'home' %}">
+            <span class="login-brand-mark" aria-hidden="true">✚</span>
+            <span>Mathias Catholic Hospital<br><small class="fw-normal opacity-75">YEJI · STAFF APPRAISAL</small></span>
+        </a> -->
+        <div class="login-message">
+            <div class="login-kicker">People growing. Better care together.</div>
+            <h1>Every contribution helps us care better.</h1>
+            <p>A dedicated space to reflect on your work, recognise progress and keep growing together as a team.</p>
         </div>
-    </div>
-</div>
+        <div class="login-photo-credit">Supporting the people who care for our community.</div>
+    </section>
+
+    <section class="login-panel" aria-labelledby="login-heading">
+        <div class="login-form-wrap">
+            <div class="login-kicker mb-3">Secure staff access</div>
+            <h2 id="login-heading">Welcome back</h2>
+            <p class="login-intro">Sign in with your staff account to continue to the appraisal system.</p>
+
+            <form method="post" id="login-form">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="login-error" role="alert">
+                        {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+
+                {% for field in form %}
+                    <div class="login-field">
+                        <label for="{{ field.id_for_label }}">
+                            {% if field.name == 'username' %}Staff ID{% else %}{{ field.label }}{% endif %}
+                        </label>
+                        {% if field.name == 'password' %}
+                            <div class="password-input-wrap">
+                                {{ field }}
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+                                    aria-label="Show password"
+                                    aria-controls="{{ field.id_for_label }}"
+                                    aria-pressed="false"
+                                >Show</button>
+                            </div>
+                        {% else %}
+                            {{ field }}
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <div class="field-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                <button type="submit" class="login-submit" id="login-submit">
+                    <span class="login-submit-label">Sign in to your account</span>
+                    <span class="ms-2 login-submit-arrow" aria-hidden="true">→</span>
+                </button>
+            </form>
+
+            <div class="login-security"><span aria-hidden="true">●</span> Your appraisal information is securely protected.</div>
+            <div class="login-footer">Mathias Catholic Hospital, Yeji<br>Staff Appraisal System</div>
+        </div>
+    </section>
+</main>
+<script>
+    (() => {
+        const form = document.getElementById('login-form');
+        const button = document.getElementById('login-submit');
+        const passwordInput = form && form.querySelector('input[name="password"]');
+        const passwordToggle = form && form.querySelector('.password-toggle');
+
+        if (passwordInput && passwordToggle) {
+            passwordToggle.addEventListener('click', () => {
+                const isVisible = passwordInput.type === 'text';
+                passwordInput.type = isVisible ? 'password' : 'text';
+                passwordToggle.textContent = isVisible ? 'Show' : 'Hide';
+                passwordToggle.setAttribute('aria-label', isVisible ? 'Show password' : 'Hide password');
+                passwordToggle.setAttribute('aria-pressed', String(!isVisible));
+                passwordInput.focus();
+            });
+        }
+
+        if (!form || !button) return;
+
+        form.addEventListener('submit', () => {
+            if (!form.checkValidity()) return;
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            button.querySelector('.login-submit-label').textContent = 'Signing in…';
+            button.querySelector('.login-submit-arrow').hidden = true;
+        });
+    })();
+</script>
 {% endblock %}

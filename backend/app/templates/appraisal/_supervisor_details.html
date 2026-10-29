@@ -1,0 +1,25 @@
+<div class="card mb-4">
+    <div class="card-header bg-secondary text-white">Supervisor details</div>
+    <div class="card-body">
+        {% if supervisor %}
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <strong>Name:</strong>
+                    {% if supervisor.title %}
+                        {{ supervisor.get_title_display }}
+                        {% if supervisor.title == 'other' and supervisor.other_title %}
+                            ({{ supervisor.other_title }})
+                        {% endif %}
+                    {% endif %}
+                    {{ supervisor.user.get_full_name|default:supervisor.user.username }}
+                    {% if supervisor.other_names %} {{ supervisor.other_names }}{% endif %}
+                </div>
+                <div class="col-md-4"><strong>Staff ID:</strong> {{ supervisor.user.username }}</div>
+                <div class="col-md-4"><strong>Job title:</strong> {{ supervisor.job_title|default:"—" }}</div>
+                <div class="col-md-4"><strong>Email:</strong> {{ supervisor.user.email|default:"—" }}</div>
+            </div>
+        {% else %}
+            <p class="text-muted mb-0">A supervisor has not been assigned yet.</p>
+        {% endif %}
+    </div>
+</div>

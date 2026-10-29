@@ -1,40 +1,356 @@
 {% extends 'base.html' %}
 
-{% block content %}
-<div class="container mt-5">
-    <h2>Supervisor Dashboard</h2>
-    <p class="text-muted">Welcome, {{ request.user.username }}. You have dual roles here.</p>
+{% block title %}Supervisor Dashboard | Staff Appraisal System{% endblock %}
 
-    <!-- Tabs Navigation -->
-    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button" role="tab">
-                <strong>👥 My Team ({{ pending_reviews.count }})</strong>
-            </button>
-        </li>
-        {% if has_supervisor %}
+{% block content %}
+<div class="supervisor-page">
+    <style>
+        body:has(.supervisor-page) { background: #f3f6f8; }
+        body:has(.supervisor-page) > .container { max-width: none; padding: 0; width: 100%; }
+        .supervisor-page {
+            color: #294653;
+            margin: 0 auto;
+            max-width: 1440px;
+            padding: clamp(1rem, 3vw, 2.5rem);
+        }
+        .supervisor-hero {
+            align-items: center;
+            background: linear-gradient(115deg, #142d3c 0%, #1d4254 100%);
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 24px;
+            box-shadow: 0 18px 42px rgba(20, 45, 60, .14);
+            color: #fff;
+            display: flex;
+            gap: 1.5rem;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+            overflow: hidden;
+            padding: clamp(1.4rem, 3vw, 2.25rem);
+            position: relative;
+        }
+        .supervisor-hero::after {
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 50%;
+            content: "";
+            height: 280px;
+            position: absolute;
+            right: -80px;
+            top: -155px;
+            width: 280px;
+        }
+        .supervisor-hero-content { position: relative; z-index: 1; }
+        .supervisor-eyebrow {
+            color: #c2d0d7;
+            font-size: .73rem;
+            font-weight: 750;
+            letter-spacing: .13em;
+            margin-bottom: .55rem;
+            text-transform: uppercase;
+        }
+        .supervisor-hero h1 {
+            font-size: clamp(1.7rem, 4vw, 2.45rem);
+            font-weight: 780;
+            letter-spacing: -.045em;
+            margin: 0 0 .45rem;
+        }
+        .supervisor-hero p { color: #d1dce1; margin: 0; max-width: 640px; }
+        .supervisor-cycle {
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.17);
+            border-radius: 12px;
+            color: #fff;
+            flex: 0 0 auto;
+            font-size: .8rem;
+            font-weight: 700;
+            padding: .75rem .95rem;
+            position: relative;
+            z-index: 1;
+        }
+        .supervisor-stats {
+            display: grid;
+            gap: .9rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-bottom: 1.35rem;
+        }
+        .supervisor-stat {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e1e8ec;
+            border-radius: 16px;
+            box-shadow: 0 8px 22px rgba(20, 45, 60, .035);
+            display: flex;
+            gap: .9rem;
+            min-width: 0;
+            padding: 1rem 1.1rem;
+        }
+        .supervisor-stat-icon {
+            align-items: center;
+            background: #edf2f5;
+            border-radius: 12px;
+            color: #23495b;
+            display: flex;
+            flex: 0 0 42px;
+            font-size: 1rem;
+            height: 42px;
+            justify-content: center;
+        }
+        .supervisor-stat-label { color: #72828b; display: block; font-size: .76rem; font-weight: 650; }
+        .supervisor-stat-value { color: #173747; display: block; font-size: 1.35rem; font-weight: 780; line-height: 1.2; }
+        .supervisor-workspace {
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 18px;
+            box-shadow: 0 10px 28px rgba(20, 45, 60, .045);
+            overflow: hidden;
+        }
+        .supervisor-tabs {
+            background: #f7f9fa;
+            border-bottom: 1px solid #e3eaed;
+            display: flex;
+            gap: .45rem;
+            overflow-x: auto;
+            padding: .8rem 1rem 0;
+        }
+        .supervisor-tabs .nav-link {
+            align-items: center;
+            border: 1px solid transparent;
+            border-bottom: 0;
+            border-radius: 10px 10px 0 0;
+            color: #667c86;
+            display: inline-flex;
+            font-size: .86rem;
+            font-weight: 700;
+            gap: .55rem;
+            min-height: 46px;
+            padding: .65rem .95rem;
+            white-space: nowrap;
+        }
+        .supervisor-tabs .nav-link:hover { background: #eef2f4; color: #173747; }
+        .supervisor-tabs .nav-link.active {
+            background: #fff;
+            border-color: #e3eaed;
+            color: #173747;
+        }
+        .supervisor-tab-count {
+            align-items: center;
+            background: #edf2f5;
+            border-radius: 999px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .7rem;
+            font-weight: 750;
+            justify-content: center;
+            min-width: 22px;
+            padding: .13rem .38rem;
+        }
+        .supervisor-tab-content { padding: clamp(1rem, 2.5vw, 1.65rem); }
+        .supervisor-section-heading {
+            align-items: start;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem 1rem;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+        .supervisor-section-heading h2 { color: #173747; font-size: 1.08rem; font-weight: 760; margin: 0 0 .28rem; }
+        .supervisor-section-heading p { color: #72828b; font-size: .84rem; margin: 0; }
+        .supervisor-create-panel {
+            background: #f7f9fa;
+            border: 1px solid #e3eaed;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            padding: 1.1rem 1.2rem;
+        }
+        .supervisor-create-heading { color: #173747; font-size: .92rem; font-weight: 750; margin-bottom: .25rem; }
+        .supervisor-create-copy { color: #72828b; font-size: .81rem; margin: 0 0 .9rem; }
+        .supervisor-page .form-label { color: #365461; font-size: .8rem; font-weight: 700; }
+        .supervisor-page .form-select {
+            border-color: #d5e1e4;
+            border-radius: 9px;
+            min-height: 42px;
+        }
+        .supervisor-page .form-select:focus {
+            border-color: #547181;
+            box-shadow: 0 0 0 .2rem rgba(23, 63, 80, .1);
+        }
+        .supervisor-action {
+            align-items: center;
+            background: #173f50;
+            border: 1px solid #173f50;
+            border-radius: 9px;
+            color: #fff;
+            display: inline-flex;
+            font-size: .83rem;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 40px;
+            padding: .55rem .85rem;
+            text-decoration: none;
+            transition: background .16s ease, transform .16s ease;
+            white-space: nowrap;
+        }
+        .supervisor-action:hover { background: #20596a; color: #fff; transform: translateY(-1px); }
+        .supervisor-table-wrap {
+            border: 1px solid #e2eaed;
+            border-radius: 13px;
+            overflow: auto;
+        }
+        .supervisor-table { color: #294653; margin: 0; vertical-align: middle; }
+        .supervisor-table thead th {
+            background: #173747;
+            border: 0;
+            color: #eaf0f3;
+            font-size: .72rem;
+            font-weight: 750;
+            letter-spacing: .055em;
+            padding: .85rem 1rem;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .supervisor-table tbody td { border-color: #edf1f3; font-size: .87rem; padding: .85rem 1rem; }
+        .supervisor-table tbody tr:last-child td { border-bottom: 0; }
+        .supervisor-table tbody tr:hover { background: #f7f9fa; }
+        .supervisor-employee { color: #173747; display: block; font-weight: 700; }
+        .supervisor-employee-id { color: #829099; display: block; font-size: .75rem; margin-top: .15rem; }
+        .supervisor-status {
+            background: #edf2f5;
+            border: 1px solid #dbe4e8;
+            border-radius: 999px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .74rem;
+            font-weight: 700;
+            padding: .3rem .62rem;
+            white-space: nowrap;
+        }
+        .supervisor-empty {
+            color: #72828b;
+            padding: 2.5rem 1rem !important;
+            text-align: center;
+        }
+        .supervisor-empty strong { color: #294653; display: block; font-size: .92rem; margin-bottom: .25rem; }
+        .supervisor-own-card {
+            background: #f7f9fa;
+            border: 1px solid #e3eaed;
+            border-radius: 15px;
+            padding: clamp(1rem, 2vw, 1.4rem);
+        }
+        .supervisor-own-top { align-items: start; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; }
+        .supervisor-own-top h2 { color: #173747; font-size: 1.08rem; font-weight: 760; margin: 0 0 .3rem; }
+        .supervisor-own-top p { color: #72828b; font-size: .86rem; margin: 0; max-width: 600px; }
+        .supervisor-own-actions { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.2rem; }
+        .supervisor-action-secondary {
+            background: #fff;
+            border: 1px solid #d7e0e5;
+            border-radius: 9px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .83rem;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 40px;
+            padding: .55rem .85rem;
+            text-decoration: none;
+        }
+        .supervisor-action-secondary:hover { background: #edf2f5; color: #173747; }
+        @media (max-width: 767.98px) {
+            .supervisor-page { padding: 1rem; }
+            .supervisor-hero { align-items: start; border-radius: 18px; flex-direction: column; }
+            .supervisor-cycle { align-self: flex-start; }
+            .supervisor-stats { gap: .55rem; grid-template-columns: 1fr; }
+            .supervisor-stat { padding: .8rem .9rem; }
+            .supervisor-stat-icon { flex-basis: 38px; height: 38px; }
+            .supervisor-tabs { padding-left: .55rem; padding-right: .55rem; }
+            .supervisor-tabs .nav-link { font-size: .8rem; padding: .6rem .7rem; }
+            .supervisor-tab-content { padding: 1rem; }
+            .supervisor-create-panel { padding: .95rem; }
+            .supervisor-create-panel button { width: 100%; }
+            .supervisor-table { min-width: 620px; }
+            .supervisor-own-actions { flex-direction: column; }
+            .supervisor-own-actions > * { width: 100%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .supervisor-page *,
+            .supervisor-page *::before,
+            .supervisor-page *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+        }
+    </style>
+
+    <header class="supervisor-hero">
+        <div class="supervisor-hero-content">
+            <div class="supervisor-eyebrow">Supervisor workspace</div>
+            <h1>Welcome, {{ request.user.first_name|default:request.user.username }}</h1>
+            <p>Manage your team’s appraisal progress and keep reviews moving through the cycle.</p>
+        </div>
+        <div class="supervisor-cycle">Active cycle · {{ cycle.year }}</div>
+    </header>
+
+    <section class="supervisor-stats" aria-label="Team appraisal summary">
+        <div class="supervisor-stat">
+            <span class="supervisor-stat-icon" aria-hidden="true">◉</span>
+            <span>
+                <span class="supervisor-stat-label">Assigned employees</span>
+                <span class="supervisor-stat-value">{{ assigned_employees.count }}</span>
+            </span>
+        </div>
+        <div class="supervisor-stat">
+            <span class="supervisor-stat-icon" aria-hidden="true">▤</span>
+            <span>
+                <span class="supervisor-stat-label">Cycle appraisals</span>
+                <span class="supervisor-stat-value">{{ assigned_appraisals.count }}</span>
+            </span>
+        </div>
+        <div class="supervisor-stat">
+            <span class="supervisor-stat-icon" aria-hidden="true">◷</span>
+            <span>
+                <span class="supervisor-stat-label">Awaiting your review</span>
+                <span class="supervisor-stat-value">{{ pending_reviews.count }}</span>
+            </span>
+        </div>
+    </section>
+
+    <section class="supervisor-workspace" aria-label="Supervisor workspace sections">
+        <ul class="nav supervisor-tabs" id="supervisor-workspace-tabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="my-appraisal-tab" data-bs-toggle="tab" data-bs-target="#my-appraisal" type="button" role="tab">
-                    <strong>📄 My Own Appraisal</strong>
+                <button
+                    class="nav-link active"
+                    id="team-tab"
+                    data-bs-toggle="tab"
+                    data-bs-target="#team"
+                    type="button"
+                    role="tab"
+                    aria-controls="team"
+                    aria-selected="true"
+                >
+                    My Team <span class="supervisor-tab-count">{{ pending_reviews.count }}</span>
                 </button>
             </li>
-        {% endif %}
-    </ul>
+            {% if has_supervisor %}
+                <li class="nav-item" role="presentation">
+                    <button
+                        class="nav-link"
+                        id="my-appraisal-tab"
+                        data-bs-toggle="tab"
+                        data-bs-target="#my-appraisal"
+                        type="button"
+                        role="tab"
+                        aria-controls="my-appraisal"
+                        aria-selected="false"
+                    >My Own Appraisal</button>
+                </li>
+            {% endif %}
+        </ul>
 
-    <!-- Tabs Content -->
-    <div class="tab-content" id="myTabContent">
-        
-        <!-- TAB 1: MY TEAM -->
-        <div class="tab-pane fade show active" id="team" role="tabpanel">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    {% if request.user.profile.role == 'Supervisor' %}
-                        <h5 class="card-title">Create Employee Appraisals</h5>
-                        <p>Select one employee or create appraisals for all employees assigned to you. Existing appraisals will not be overwritten.</p>
-                        <form method="post" action="{% url 'supervisor_create_appraisals' %}" class="row g-2 align-items-end mb-4">
+        <div class="tab-content supervisor-tab-content" id="supervisor-workspace-content">
+            <div class="tab-pane fade show active" id="team" role="tabpanel" aria-labelledby="team-tab" tabindex="0">
+                {% if request.user.profile.role == 'Supervisor' %}
+                    <section class="supervisor-create-panel" aria-labelledby="create-appraisal-heading">
+                        <h2 class="supervisor-create-heading" id="create-appraisal-heading">Create employee appraisals</h2>
+                        <p class="supervisor-create-copy">Start appraisals for one assigned employee or for your whole team. Existing appraisals will not be overwritten.</p>
+                        <form method="post" action="{% url 'supervisor_create_appraisals' %}" class="row g-3 align-items-end">
                             {% csrf_token %}
                             <div class="col-md-8">
-                                <label for="employee-selection" class="form-label">Employee</label>
+                                <label for="employee-selection" class="form-label">Select employee</label>
                                 <select id="employee-selection" name="employee_selection" class="form-select" required>
                                     <option value="">Choose an employee or all</option>
                                     <option value="all">All my assigned employees</option>
@@ -46,99 +362,130 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <button type="submit" class="btn btn-success">Create Appraisal(s)</button>
+                                <button type="submit" class="supervisor-action">Create appraisal(s)</button>
                             </div>
                         </form>
-                    {% endif %}
+                    </section>
+                {% endif %}
 
-                    <h5 class="card-title">My Assigned Appraisals</h5>
-                    <table class="table table-hover mt-3">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Employee ID</th>
-                                <th>Department</th>
-                                <th>Cycle</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for appraisal in assigned_appraisals %}
-                            <tr>
-                                <td>{{ appraisal.employee.user.username }}</td>
-                                <td>{{ appraisal.employee.department.name|default:"—" }}</td>
-                                <td>{{ appraisal.cycle.year }}</td>
-                                <td>{{ appraisal.get_status_display }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No appraisals assigned for this cycle yet.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <section aria-labelledby="assigned-appraisals-heading">
+                    <div class="supervisor-section-heading">
+                        <div>
+                            <h2 id="assigned-appraisals-heading">My Assigned Appraisals</h2>
+                            <p>Current-cycle appraisal records for your team.</p>
+                        </div>
+                    </div>
+                    <div class="supervisor-table-wrap mb-4">
+                        <table class="table supervisor-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Department</th>
+                                    <th>Cycle</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for appraisal in assigned_appraisals %}
+                                    <tr>
+                                        <td>
+                                            <span class="supervisor-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span>
+                                            {% if appraisal.employee.user.get_full_name %}
+                                                <span class="supervisor-employee-id">{{ appraisal.employee.user.username }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ appraisal.employee.department.name|default:"—" }}</td>
+                                        <td>{{ appraisal.cycle.year }}</td>
+                                        <td><span class="supervisor-status">{{ appraisal.get_status_display }}</span></td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="supervisor-empty">
+                                            <strong>No appraisals started yet</strong>
+                                            Appraisals assigned to you for this cycle will appear here.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-                    <hr>
-                    <h5 class="card-title">Appraisals Pending My Review</h5>
-                    <table class="table table-hover mt-3">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Employee ID</th>
-                                <th>Department</th>
-                                <th>Cycle</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for appraisal in pending_reviews %}
-                            <tr>
-                                <td>{{ appraisal.employee.user.username }}</td>
-                                <td>{{ appraisal.employee.department.name }}</td>
-                                <td>{{ appraisal.cycle.year }}</td>
-                                <td>
-                                    <a href="{% url 'supervisor_review' appraisal.id %}" class="btn btn-sm btn-primary">Review Form</a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No pending team appraisals right now.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                <section aria-labelledby="pending-reviews-heading">
+                    <div class="supervisor-section-heading">
+                        <div>
+                            <h2 id="pending-reviews-heading">Appraisals Pending My Review</h2>
+                            <p>Open an appraisal to review the employee’s submission.</p>
+                        </div>
+                    </div>
+                    <div class="supervisor-table-wrap">
+                        <table class="table supervisor-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Department</th>
+                                    <th>Cycle</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for appraisal in pending_reviews %}
+                                    <tr>
+                                        <td>
+                                            <span class="supervisor-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span>
+                                            {% if appraisal.employee.user.get_full_name %}
+                                                <span class="supervisor-employee-id">{{ appraisal.employee.user.username }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ appraisal.employee.department.name|default:"—" }}</td>
+                                        <td>{{ appraisal.cycle.year }}</td>
+                                        <td>
+                                            <a href="{% url 'supervisor_review' appraisal.id %}" class="supervisor-action">Review appraisal</a>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="supervisor-empty">
+                                            <strong>You’re all caught up</strong>
+                                            No team appraisals are waiting for your review.
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
             </div>
-        </div>
 
-        <!-- TAB 2: MY OWN APPRAISAL -->
-        {% if has_supervisor %}
-            <div class="tab-pane fade" id="my-appraisal" role="tabpanel">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">My Appraisal Status</h5>
-                        <hr>
-                        <h6>Status: <span class="badge bg-info">{{ my_appraisal.get_status_display }}</span></h6>
-
-                        <p class="mt-3">As an employee, you also need to set your goals and submit them to your assigned supervisor.</p>
-
-                        <div class="mt-4">
-                            <a href="{% url 'fill_targets' %}" class="btn btn-primary">
-                                {% if my_appraisal.status == 'draft' %} Edit My Goals {% else %} View My Goals {% endif %}
+            {% if has_supervisor %}
+                <div class="tab-pane fade" id="my-appraisal" role="tabpanel" aria-labelledby="my-appraisal-tab" tabindex="0">
+                    <section class="supervisor-own-card">
+                        <div class="supervisor-own-top">
+                            <div>
+                                <h2>My Own Appraisal</h2>
+                                <p>As an employee, you can also set your goals and submit them to your assigned supervisor.</p>
+                            </div>
+                            <span class="supervisor-status">{{ my_appraisal.get_status_display }}</span>
+                        </div>
+                        <div class="supervisor-own-actions">
+                            <a href="{% url 'fill_targets' %}" class="supervisor-action-secondary">
+                                {% if my_appraisal.status == 'draft' %}Edit my goals{% else %}View my goals{% endif %}
                             </a>
-
                             {% if my_appraisal.status == 'draft' %}
-                                <form method="POST" action="{% url 'submit_to_supervisor' my_appraisal.id %}" style="display:inline;">
+                                <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-success" onclick="return confirm('Submit to your supervisor? You cannot edit after this.')">
-                                        Submit to My Supervisor
-                                    </button>
+                                    <button
+                                        type="submit"
+                                        class="supervisor-action"
+                                        onclick="return confirm('Submit to your supervisor? You cannot edit after this.')"
+                                    >Submit to my supervisor</button>
                                 </form>
                             {% endif %}
                         </div>
-                    </div>
+                    </section>
                 </div>
-            </div>
-        {% endif %}
-
-    </div>
+            {% endif %}
+        </div>
+    </section>
 </div>
 {% endblock %}

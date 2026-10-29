@@ -3,17 +3,22 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Case, CharField, Count, F, Q, Value, When
 from django.urls import reverse
 from django.http import JsonResponse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 
 from .models import (
     Appraisal,
+    AppraisalCompetencyStatementScore,
     AppraisalCycle,
+    AppNotification,
     AppraisalReturn,
     AssignSupervisor,
+    Competency,
     Department,
     EmployeeProfile,
 )
@@ -26,10 +31,94 @@ from .forms import (
     HRCommentForm,
     HRSupervisorAssignmentForm,
     SupervisorCompetencyFormSet,
+    SupervisorCompetencyStatementFormSet,
     SupervisorTargetFormSet,
     TargetFormSet,
     UserProfileForm,
 )
+from .notifications import mark_as_read, notify_users
+
+
+def _process_hr_supervisor_assignment(request):
+    form = HRSupervisorAssignmentForm(request.POST)
+    if not form.is_valid():
+        return form, None, None
+
+    department = form.cleaned_data['department']
+    employee = form.cleaned_data['employee']
+    supervisor = form.cleaned_data['supervisor']
+    appraisals_to_transfer = Appraisal.objects.filter(
+        employee=employee,
+        status__in=['pending_manager', 'returned_supervisor'],
+    ).exclude(supervisor=supervisor)
+
+    if appraisals_to_transfer.exists() and request.POST.get('confirm_transfer') != '1':
+        confirmation = {
+            'department_id': department.id,
+            'employee_id': employee.id,
+            'supervisor_id': supervisor.id,
+            'employee_name': employee.user.get_full_name() or employee.user.username,
+            'supervisor_name': supervisor.user.get_full_name() or supervisor.user.username,
+            'appraisal_count': appraisals_to_transfer.count(),
+        }
+        return form, confirmation, None
+
+    previous_assignment = AssignSupervisor.objects.filter(
+        employee=employee,
+    ).select_related('supervisor__user').first()
+    previous_supervisor = (
+        previous_assignment.supervisor
+        if previous_assignment and previous_assignment.supervisor_id != supervisor.id
+        else None
+    )
+    supervisor_changed = previous_assignment is None or previous_assignment.supervisor_id != supervisor.id
+
+    with transaction.atomic():
+        AssignSupervisor.objects.filter(employee=employee).delete()
+        AssignSupervisor.objects.create(
+            department=department,
+            employee=employee,
+            supervisor=supervisor,
+        )
+        Appraisal.objects.filter(
+            employee=employee,
+            status__in=['draft', 'returned_employee'],
+        ).update(supervisor=supervisor)
+        transferred_count = 0
+        if request.POST.get('confirm_transfer') == '1':
+            transferred_count = appraisals_to_transfer.update(supervisor=supervisor)
+
+        if supervisor_changed:
+            notified_users = [employee.user, supervisor.user]
+            if previous_supervisor:
+                notified_users.append(previous_supervisor.user)
+            previous_name = (
+                previous_supervisor.user.get_full_name() or previous_supervisor.user.username
+                if previous_supervisor
+                else 'no previous supervisor'
+            )
+            notify_users(
+                notified_users,
+                title='Supervisor assignment updated',
+                message=(
+                    f"Supervisor for {employee.user.get_full_name() or employee.user.username} "
+                    f"changed from {previous_name} to "
+                    f"{supervisor.user.get_full_name() or supervisor.user.username}."
+                ),
+                url=reverse('dashboard_router'),
+            )
+
+    return form, None, (
+        employee.user.username,
+        supervisor.user.username,
+        transferred_count,
+    )
+
+
+def home(request):
+    if request.user.is_authenticated:
+        return redirect('dashboard_router')
+    return render(request, 'home.html')
 
 
 @login_required
@@ -43,8 +132,13 @@ def dashboard_router(request):
         return redirect('hod_dashboard')
     elif profile.role == 'Supervisor':
         return redirect('supervisor_dashboard')
+
+    elif request.user.is_superuser: 
+        return redirect("/admin")
+
     else:
-        return redirect('employee_dashboard')
+        return redirect('employee_dashboard') 
+    
 
 def employee_dashboard(request):
     """Shows the employee their current appraisal status."""
@@ -104,12 +198,35 @@ def fill_targets(request):
             and employee_info_form.is_valid()
             and training_formset.is_valid()
         ):
-            selected_competencies = competency_form.cleaned_data['competencies']
+            selected_statement_values = competency_form.cleaned_data['competency_statements']
+            selected_statement_map = {
+                statement['value']: (
+                    group['competency'],
+                    index,
+                    statement['text'],
+                )
+                for group in competency_form.competency_groups
+                for index, statement in enumerate(group['statements'])
+            }
+            selected_statements = [
+                selected_statement_map[value]
+                for value in selected_statement_values
+            ]
+            if not selected_statement_values:
+                selected_statements = [
+                    (competency, index, statement)
+                    for competency in competency_form.cleaned_data['competencies']
+                    for index, statement in enumerate(competency.description_items)
+                ]
+            selected_competencies = {
+                competency.id: competency
+                for competency, _, _ in selected_statements
+            }
             submit_for_review = request.POST.get('action') == 'submit'
             assignment = None
 
-            if submit_for_review and not selected_competencies:
-                messages.error(request, "Select at least one competency before submitting your appraisal.")
+            if submit_for_review and not selected_statements:
+                messages.error(request, "Select at least one competency statement before submitting your appraisal.")
             elif submit_for_review:
                 assignment = AssignSupervisor.objects.filter(
                     employee=profile,
@@ -120,17 +237,37 @@ def fill_targets(request):
                         "You cannot submit because no supervisor has been assigned to you yet. Contact HR.",
                     )
 
-            if not submit_for_review or (selected_competencies and assignment):
+            if not submit_for_review or (selected_statements and assignment):
                 with transaction.atomic():
                     employee_info_form.save()
                     formset.save()
                     training_formset.save()
-                    selected_ids = list(selected_competencies.values_list('id', flat=True))
+                    selected_ids = list(selected_competencies)
                     appraisal.competency_scores.exclude(
                         competency_id__in=selected_ids,
                     ).delete()
-                    for competency in selected_competencies:
-                        appraisal.competency_scores.get_or_create(competency=competency)
+                    for competency in selected_competencies.values():
+                        competency_score, _ = appraisal.competency_scores.get_or_create(
+                            competency=competency,
+                        )
+                        selected_for_competency = [
+                            (index, statement)
+                            for selected_competency, index, statement in selected_statements
+                            if selected_competency.id == competency.id
+                        ]
+                        selected_indexes = [index for index, _ in selected_for_competency]
+                        competency_score.statement_scores.exclude(
+                            statement_index__in=selected_indexes,
+                        ).delete()
+                        for index, statement in selected_for_competency:
+                            statement_score, created = competency_score.statement_scores.get_or_create(
+                                statement_index=index,
+                                defaults={'statement': statement},
+                            )
+                            if not created and statement_score.statement != statement:
+                                statement_score.statement = statement
+                                statement_score.end_year_score = None
+                                statement_score.save(update_fields=['statement', 'end_year_score'])
 
                     if assignment:
                         appraisal.supervisor = assignment.supervisor
@@ -141,6 +278,15 @@ def fill_targets(request):
                             'status',
                             'employee_signed_at',
                         ])
+                        notify_users(
+                            [assignment.supervisor.user],
+                            title='Appraisal awaiting your review',
+                            message=(
+                                f"{profile.user.get_full_name() or profile.user.username} "
+                                f"submitted the {appraisal.cycle.year} appraisal for your review."
+                            ),
+                            url=reverse('supervisor_review', args=[appraisal.id]),
+                        )
 
                 if assignment:
                     messages.success(request, "Appraisal saved and submitted to your supervisor.")
@@ -164,10 +310,20 @@ def fill_targets(request):
                     'competency_id',
                     flat=True,
                 ),
+                'competency_statements': [
+                    f'{competency_score.competency_id}:{statement_score.statement_index}'
+                    for competency_score in appraisal.competency_scores.prefetch_related(
+                        'statement_scores',
+                    )
+                    for statement_score in competency_score.statement_scores.all()
+                ],
             }
         )
 
     if appraisal.status in ['draft', 'returned_employee']:
+        assignment = AssignSupervisor.objects.filter(
+            employee=profile,
+        ).select_related('supervisor__user').first()
         if not formset.is_bound:
             formset = TargetFormSet(instance=appraisal)
         if not competency_form.is_bound:
@@ -177,20 +333,35 @@ def fill_targets(request):
                         'competency_id',
                         flat=True,
                     ),
+                    'competency_statements': [
+                        f'{competency_score.competency_id}:{statement_index}'
+                        for competency_score in appraisal.competency_scores.prefetch_related(
+                            'statement_scores',
+                        )
+                        for statement_index in (
+                            list(competency_score.statement_scores.values_list(
+                                'statement_index',
+                                flat=True,
+                            ))
+                            or list(range(len(competency_score.competency.description_items)))
+                        )
+                    ],
                 }
             )
-        selected_competency_ids = {
-            str(competency_id)
-            for competency_id in (competency_form['competencies'].value() or [])
-        }
+        selected_statement_ids = set(
+            competency_form['competency_statements'].value() or []
+        )
         return render(request, 'employee/fill_targets.html', {
             'formset': formset,
             'employee_info_form': employee_info_form,
             'training_formset': training_formset,
             'competency_form': competency_form,
-            'available_competencies': competency_form.fields['competencies'].queryset,
-            'selected_competency_ids': selected_competency_ids,
+            'competency_groups': competency_form.competency_groups,
+            'selected_statement_ids': selected_statement_ids,
             'appraisal': appraisal,
+            'assigned_supervisor': (
+                assignment.supervisor if assignment else appraisal.supervisor
+            ),
             'read_only': False,
             'return_history': appraisal.returns.select_related('reviewer'),
         })
@@ -200,7 +371,10 @@ def fill_targets(request):
         'read_only': True,
         'trainings': appraisal.trainings.all(),
         'targets': appraisal.targets.all(),
-        'competencies': appraisal.competency_scores.select_related('competency'),
+        'competencies': appraisal.competency_scores.select_related(
+            'competency',
+        ).prefetch_related('statement_scores'),
+        'score_breakdown': appraisal.get_score_breakdown(),
         'return_history': appraisal.returns.select_related('reviewer'),
     })
 
@@ -222,6 +396,49 @@ def profile(request):
         form = UserProfileForm(instance=request.user, profile=employee_profile)
 
     return render(request, 'account/profile.html', {'form': form})
+
+
+@login_required
+def notifications(request):
+    notification_list = AppNotification.objects.filter(recipient=request.user)
+    page = Paginator(notification_list, 20).get_page(request.GET.get('page', 1))
+    return render(request, 'account/notifications.html', {
+        'notification_page': page,
+        'unread_notification_count': notification_list.filter(
+            read_at__isnull=True,
+        ).count(),
+    })
+
+
+@login_required
+def open_notification(request, notification_id):
+    if request.method != 'POST':
+        return redirect('notifications')
+
+    notification = get_object_or_404(
+        AppNotification,
+        pk=notification_id,
+        recipient=request.user,
+    )
+    mark_as_read(notification)
+    destination = notification.url
+    if not destination or not url_has_allowed_host_and_scheme(
+        destination,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        destination = reverse('dashboard_router')
+    return redirect(destination)
+
+
+@login_required
+def mark_all_notifications_read(request):
+    if request.method == 'POST':
+        AppNotification.objects.filter(
+            recipient=request.user,
+            read_at__isnull=True,
+        ).update(read_at=timezone.now())
+    return redirect('notifications')
 
 
 @login_required
@@ -274,6 +491,15 @@ def submit_to_supervisor(request, appraisal_id):
         appraisal.status = 'pending_manager'
         appraisal.employee_signed_at = timezone.now()
         appraisal.save()
+        notify_users(
+            [assignment.supervisor.user],
+            title='Appraisal awaiting your review',
+            message=(
+                f"{request.user.get_full_name() or request.user.username} "
+                f"submitted the {appraisal.cycle.year} appraisal for your review."
+            ),
+            url=reverse('supervisor_review', args=[appraisal.id]),
+        )
 
         messages.success(request, "Appraisal submitted to your supervisor successfully!")
     
@@ -326,6 +552,7 @@ def supervisor_dashboard(request):
     ).select_related('employee__user', 'employee__department', 'cycle')
 
     context = {
+        'cycle': cycle,
         'my_appraisal': my_appraisal,
         'has_supervisor': has_supervisor,
         'pending_reviews': pending_reviews,
@@ -410,6 +637,9 @@ def supervisor_review(request, appraisal_id):
     """Allows the supervisor to score the employee."""
     profile = request.user.profile
     appraisal = get_object_or_404(Appraisal, id=appraisal_id, supervisor=profile)
+    statement_scores = AppraisalCompetencyStatementScore.objects.filter(
+        competency_score__appraisal=appraisal,
+    ).select_related('competency_score__competency')
 
     # SECURITY: If it's not their turn, lock it.
     if appraisal.status not in ['pending_manager', 'returned_supervisor']:
@@ -419,22 +649,61 @@ def supervisor_review(request, appraisal_id):
     if request.method == 'POST':
         target_formset = SupervisorTargetFormSet(request.POST, instance=appraisal)
         comp_formset = SupervisorCompetencyFormSet(request.POST, instance=appraisal)
+        statement_score_formset = SupervisorCompetencyStatementFormSet(
+            request.POST,
+            queryset=statement_scores,
+            prefix='statement_scores',
+        )
 
-        if target_formset.is_valid() and comp_formset.is_valid():
+        if (
+            target_formset.is_valid()
+            and comp_formset.is_valid()
+            and statement_score_formset.is_valid()
+        ):
             with transaction.atomic():
                 target_formset.save()
                 comp_formset.save()
+                statement_score_formset.save()
             messages.success(request, "Scores saved as draft. You can submit to HOD when ready.")
             return redirect('supervisor_dashboard')
         messages.error(request, "Scores were not saved. Correct the highlighted errors and try again.")
     else:
         target_formset = SupervisorTargetFormSet(instance=appraisal)
         comp_formset = SupervisorCompetencyFormSet(instance=appraisal)
+        statement_score_formset = SupervisorCompetencyStatementFormSet(
+            queryset=statement_scores,
+            prefix='statement_scores',
+        )
+
+    statement_forms_by_competency_score = {}
+    for statement_form in statement_score_formset.forms:
+        statement_forms_by_competency_score.setdefault(
+            statement_form.instance.competency_score_id,
+            [],
+        ).append(statement_form)
+    competency_groups = [
+        {
+            'form': competency_form,
+            'statements': statement_forms_by_competency_score.get(
+                competency_form.instance.pk,
+                [],
+            ),
+            'weight': (
+                '0.3'
+                if competency_form.instance.competency.competency_type == 'core'
+                else '0.1'
+            ),
+            'type': competency_form.instance.competency.competency_type,
+        }
+        for competency_form in comp_formset.forms
+    ]
 
     return render(request, 'supervisor/review.html', {
         'appraisal': appraisal,
         'target_formset': target_formset,
         'comp_formset': comp_formset,
+        'statement_score_formset': statement_score_formset,
+        'competency_groups': competency_groups,
         'trainings': appraisal.trainings.all(),
         'return_form': AppraisalReturnForm(),
         'return_history': appraisal.returns.select_related('reviewer'),
@@ -448,6 +717,12 @@ def supervisor_submit_to_hod(request, appraisal_id):
     appraisal = get_object_or_404(Appraisal, id=appraisal_id, supervisor=profile)
 
     if appraisal.status in ['pending_manager', 'returned_supervisor']:
+        try:
+            appraisal.validate_final_score_inputs()
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+            return redirect('supervisor_review', appraisal_id=appraisal.id)
+
         # Find the HOD for this employee's department
         from .models import AssignDepartmentHod
         hod_assignment = AssignDepartmentHod.objects.filter(department=appraisal.employee.department).first()
@@ -460,6 +735,15 @@ def supervisor_submit_to_hod(request, appraisal_id):
         appraisal.status = 'pending_hod'
         appraisal.supervisor_signed_at = timezone.now()
         appraisal.save()
+        notify_users(
+            [hod_assignment.hod.user],
+            title='Appraisal awaiting your review',
+            message=(
+                f"{appraisal.employee.user.get_full_name() or appraisal.employee.user.username}'s "
+                f"{appraisal.cycle.year} appraisal is ready for your review."
+            ),
+            url=reverse('hod_review', args=[appraisal.id]),
+        )
 
         messages.success(request, "Appraisal successfully submitted to the HOD.")
     
@@ -517,6 +801,26 @@ def return_appraisal(request, appraisal_id):
         )
         appraisal.status = destination_status
         appraisal.save(update_fields=['status'])
+
+    return_recipients = {
+        'returned_employee': appraisal.employee.user,
+        'returned_supervisor': appraisal.supervisor.user if appraisal.supervisor_id else None,
+        'returned_hod': appraisal.hod.user if appraisal.hod_id else None,
+    }
+    return_destinations = {
+        'returned_employee': reverse('employee_dashboard'),
+        'returned_supervisor': reverse('supervisor_dashboard'),
+        'returned_hod': reverse('hod_dashboard'),
+    }
+    notify_users(
+        [return_recipients[destination_status]],
+        title='Appraisal returned for updates',
+        message=(
+            f"{appraisal.employee.user.get_full_name() or appraisal.employee.user.username}'s "
+            f"{appraisal.cycle.year} appraisal was returned by {request.user.username}."
+        ),
+        url=return_destinations[destination_status],
+    )
 
     recipient = {
         'returned_employee': 'the employee',
@@ -583,6 +887,18 @@ def hod_review(request, appraisal_id):
             appraisal.status = 'pending_hr'
             appraisal.hod_signed_at = timezone.now()
             appraisal.save()
+            hr_profiles = EmployeeProfile.objects.filter(
+                role='HR',
+            ).select_related('user')
+            notify_users(
+                [hr_profile.user for hr_profile in hr_profiles],
+                title='Appraisal awaiting HR approval',
+                message=(
+                    f"{appraisal.employee.user.get_full_name() or appraisal.employee.user.username}'s "
+                    f"{appraisal.cycle.year} appraisal was submitted for final approval."
+                ),
+                url=reverse('hr_dashboard'),
+            )
             
             messages.success(request, "Appraisal reviewed and submitted to HR successfully.")
             return redirect('hod_dashboard')
@@ -624,47 +940,200 @@ def hr_dashboard(request):
     ]
 
     if request.method == 'POST':
-        submitted_roles = {}
-        allowed_profile_ids = {str(user.id) for user in users}
-        for key, role in request.POST.items():
-            if not key.startswith('role_'):
-                continue
-            profile_id = key.removeprefix('role_')
-            if profile_id not in allowed_profile_ids or role not in dict(role_choices):
-                messages.error(request, "Choose a valid user and role.")
-                return redirect('hr_dashboard')
-            submitted_roles[profile_id] = role
+        if request.POST.get('assignment_action') == 'save':
+            assignment_form, transfer_confirmation, saved_assignment = (
+                _process_hr_supervisor_assignment(request)
+            )
+            if saved_assignment:
+                employee_username, supervisor_username, transferred_count = saved_assignment
+                messages.success(
+                    request,
+                    f"Supervisor for {employee_username} was assigned to {supervisor_username}.",
+                )
+                if transferred_count:
+                    messages.success(
+                        request,
+                        f"Transferred {transferred_count} in-progress appraisal(s). "
+                        "Existing scores, comments, and return history were preserved.",
+                    )
+                return redirect(f"{reverse('hr_dashboard')}#assignments")
+        else:
+            assignment_form = HRSupervisorAssignmentForm()
+            transfer_confirmation = None
 
-        if not submitted_roles:
-            messages.error(request, "No user roles were submitted.")
-            return redirect('hr_dashboard')
+        if request.POST.get('assignment_action') != 'save':
+            assignment_form = HRSupervisorAssignmentForm()
+            transfer_confirmation = None
 
-        changed_count = 0
-        with transaction.atomic():
+        if request.POST.get('assignment_action') != 'save':
+            roles_dashboard_url = f"{reverse('hr_dashboard')}#roles"
+            submitted_roles = {}
+            allowed_profile_ids = {str(user.id) for user in users}
+            for key, role in request.POST.items():
+                if not key.startswith('role_'):
+                    continue
+                profile_id = key.removeprefix('role_')
+                if profile_id not in allowed_profile_ids or role not in dict(role_choices):
+                    messages.error(request, "Choose a valid user and role.")
+                    return redirect(roles_dashboard_url)
+                submitted_roles[profile_id] = role
+
+            if not submitted_roles:
+                messages.error(request, "No user roles were submitted.")
+                return redirect(roles_dashboard_url)
+
+            blocked_role_changes = []
             for user_profile in users:
                 new_role = submitted_roles.get(str(user_profile.id))
-                if new_role and user_profile.role != new_role:
-                    user_profile.role = new_role
-                    user_profile.save(update_fields=['role'])
-                    changed_count += 1
+                if user_profile.role != 'Supervisor' or not new_role or new_role == 'Supervisor':
+                    continue
 
-        if changed_count:
-            messages.success(request, f"Updated {changed_count} user role(s).")
-        else:
-            messages.info(request, "No user roles needed updating.")
-        return redirect('hr_dashboard')
+                pending_count = Appraisal.objects.filter(
+                    supervisor=user_profile,
+                    status__in=['pending_manager', 'returned_supervisor'],
+                ).count()
+                has_assignments = AssignSupervisor.objects.filter(
+                    supervisor=user_profile,
+                ).exists()
+                if pending_count or has_assignments:
+                    reason = []
+                    if pending_count:
+                        reason.append(f'{pending_count} appraisal(s) awaiting review')
+                    if has_assignments:
+                        reason.append('employee assignments')
+                    blocked_role_changes.append(
+                        f"{user_profile.user.username} has " + ' and '.join(reason)
+                    )
+
+            if blocked_role_changes:
+                messages.error(
+                    request,
+                    "Reassign the following supervisor workload before changing roles: "
+                    + '; '.join(blocked_role_changes) + '.',
+                )
+                return redirect(roles_dashboard_url)
+
+            changed_count = 0
+            with transaction.atomic():
+                for user_profile in users:
+                    new_role = submitted_roles.get(str(user_profile.id))
+                    if new_role and user_profile.role != new_role:
+                        old_role = user_profile.get_role_display()
+                        user_profile.role = new_role
+                        user_profile.save(update_fields=['role'])
+                        notify_users(
+                            [user_profile.user],
+                            title='Your account role was updated',
+                            message=(
+                                f"Your role was changed from {old_role} to "
+                                f"{user_profile.get_role_display()} by HR."
+                            ),
+                            url=reverse('dashboard_router'),
+                        )
+                        changed_count += 1
+
+            if changed_count:
+                messages.success(request, f"Updated {changed_count} user role(s).")
+            else:
+                messages.info(request, "No user roles needed updating.")
+            return redirect(roles_dashboard_url)
 
     # Get all appraisals that the HOD has pushed to HR
     pending_reviews = Appraisal.objects.filter(
         status='pending_hr'
     ).select_related('employee__user', 'supervisor__user', 'hod__user', 'cycle')
 
+    cycles = AppraisalCycle.objects.order_by('-year')
+    departments = Department.objects.order_by('name')
+    selected_cycle = request.GET.get('cycle', '').strip()
+    available_cycle_years = set(cycles.values_list('year', flat=True))
+    if selected_cycle:
+        try:
+            selected_cycle_year = int(selected_cycle)
+        except ValueError:
+            selected_cycle_year = None
+        if selected_cycle_year not in available_cycle_years:
+            selected_cycle_year = None
+    else:
+        selected_cycle_year = AppraisalCycle.objects.filter(
+            is_active=True,
+        ).values_list('year', flat=True).first()
+
+    selected_department = request.GET.get('department', '').strip()
+    if selected_department and not departments.filter(pk=selected_department).exists():
+        selected_department = ''
+
+    dashboard_appraisals = Appraisal.objects.all()
+    if selected_cycle_year is not None:
+        dashboard_appraisals = dashboard_appraisals.filter(
+            cycle__year=selected_cycle_year,
+        )
+    if selected_department:
+        dashboard_appraisals = dashboard_appraisals.filter(
+            Q(employee_department_id=selected_department)
+            | Q(employee_department__isnull=True, employee__department_id=selected_department),
+        )
+
+    status_counts = dashboard_appraisals.aggregate(
+        total=Count('pk'),
+        draft=Count('pk', filter=Q(status='draft')),
+        supervisor=Count('pk', filter=Q(status__in=['pending_manager', 'returned_supervisor'])),
+        hod=Count('pk', filter=Q(status__in=['pending_hod', 'returned_hod'])),
+        hr=Count('pk', filter=Q(status='pending_hr')),
+        returned_employee=Count('pk', filter=Q(status='returned_employee')),
+        completed=Count('pk', filter=Q(status='completed')),
+    )
+    department_rows = dashboard_appraisals.annotate(
+        department_label=Case(
+            When(employee_department__isnull=False, then=F('employee_department__name')),
+            When(employee_department_name__gt=Value(''), then=F('employee_department_name')),
+            When(employee__department__isnull=False, then=F('employee__department__name')),
+            default=Value('Unassigned'),
+            output_field=CharField(),
+        ),
+    ).values('department_label').annotate(
+        total=Count('pk'),
+        completed=Count('pk', filter=Q(status='completed')),
+    ).order_by('department_label')
+    department_chart = [
+        {
+            'name': row['department_label'],
+            'completed': row['completed'],
+            'in_progress': row['total'] - row['completed'],
+        }
+        for row in department_rows
+    ]
+
     return render(request, 'hr/dashboard.html', {
         'pending_reviews': pending_reviews,
-        'departments': Department.objects.order_by('name'),
-        'cycles': AppraisalCycle.objects.order_by('-year'),
+        'departments': departments,
+        'cycles': cycles,
         'users': users,
         'role_choices': role_choices,
+        'supervisor_assignment_form': (
+            assignment_form
+            if request.method == 'POST' and request.POST.get('assignment_action') == 'save'
+            else HRSupervisorAssignmentForm()
+        ),
+        'transfer_confirmation': (
+            transfer_confirmation
+            if request.method == 'POST' and request.POST.get('assignment_action') == 'save'
+            else None
+        ),
+        'dashboard_filters': {
+            'cycle': selected_cycle_year,
+            'department': selected_department,
+        },
+        'dashboard_counts': status_counts,
+        'workflow_chart': [
+            {'label': 'Draft', 'count': status_counts['draft']},
+            {'label': 'Supervisor review', 'count': status_counts['supervisor']},
+            {'label': 'HOD review', 'count': status_counts['hod']},
+            {'label': 'HR approval', 'count': status_counts['hr']},
+            {'label': 'Returned to employee', 'count': status_counts['returned_employee']},
+            {'label': 'Completed', 'count': status_counts['completed']},
+        ],
+        'department_chart': department_chart,
     })
 
 
@@ -785,28 +1254,30 @@ def hr_supervisor_assignments(request):
         return redirect('dashboard_router')
 
     if request.method == 'POST':
-        form = HRSupervisorAssignmentForm(request.POST)
-        if form.is_valid():
-            department = form.cleaned_data['department']
-            employee = form.cleaned_data['employee']
-            supervisor = form.cleaned_data['supervisor']
-            with transaction.atomic():
-                AssignSupervisor.objects.filter(employee=employee).delete()
-                AssignSupervisor.objects.create(
-                    department=department,
-                    employee=employee,
-                    supervisor=supervisor,
-                )
-                Appraisal.objects.filter(
-                    employee=employee,
-                    status__in=['draft', 'returned_employee'],
-                ).update(supervisor=supervisor)
-
+        form, transfer_confirmation, saved_assignment = _process_hr_supervisor_assignment(request)
+        if transfer_confirmation:
+            return render(request, 'hr/supervisor_assignments.html', {
+                'form': form,
+                'departments': Department.objects.order_by('name'),
+                'transfer_confirmation': transfer_confirmation,
+            })
+        if saved_assignment:
+            employee_username, supervisor_username, transferred_count = saved_assignment
             messages.success(
                 request,
-                f"Supervisor for {employee.user.username} was assigned to {supervisor.user.username}.",
+                f"Supervisor for {employee_username} was assigned to {supervisor_username}.",
             )
+            if transferred_count:
+                messages.success(
+                    request,
+                    f"Transferred {transferred_count} in-progress appraisal(s). "
+                    "Existing scores, comments, and return history were preserved.",
+                )
             return redirect('hr_supervisor_assignments')
+        return render(request, 'hr/supervisor_assignments.html', {
+            'form': form,
+            'departments': Department.objects.order_by('name'),
+        })
     else:
         initial = {}
         department_id = request.GET.get('department')
@@ -878,6 +1349,8 @@ def hr_search_supervisor_assignments(request):
             'employee_name': employee.user.get_full_name() or employee.user.username,
             'supervisor_staff_id': supervisor.user.username,
             'supervisor_name': supervisor.user.get_full_name() or supervisor.user.username,
+            'department_id': assignment.department_id,
+            'supervisor_id': supervisor.id,
             'edit_url': (
                 f"{reverse('hr_supervisor_assignments')}?"
                 f"department={assignment.department_id}&employee={employee.id}"
@@ -963,10 +1436,20 @@ def hr_approve(request, appraisal_id):
             appraisal.hr_approved_at = timezone.now()
             
             # Calculate the final score automatically!
-            appraisal.calculate_final_score()
+            try:
+                appraisal.calculate_final_score()
+            except ValidationError as error:
+                messages.error(request, error.messages[0])
+                return redirect('hr_approve', appraisal_id=appraisal.id)
             
             appraisal.save()
             
+            notify_users(
+                [appraisal.employee.user],
+                title='Appraisal completed',
+                message=f"Your {appraisal.cycle.year} appraisal has been approved and completed.",
+                url=reverse('employee_dashboard'),
+            )
             messages.success(request, "Appraisal officially approved, scored, and locked.")
             return redirect('hr_dashboard')
     else:

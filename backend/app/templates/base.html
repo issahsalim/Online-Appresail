@@ -17,6 +17,117 @@
             font-weight: bold;
             letter-spacing: 1px;
         }
+        .navbar-appraisal {
+            background: #142d3c;
+            box-shadow: 0 3px 14px rgba(9, 43, 70, .12);
+        }
+        .navbar-appraisal .navbar-brand { letter-spacing: .02em; }
+        .navbar-user {
+            align-items: center;
+            color: #d9e4e9;
+            display: flex;
+            font-size: .9rem;
+            gap: .35rem;
+            padding: .5rem .8rem;
+        }
+        .navbar-user strong { color: #fff; }
+        .navbar-logout {
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .25);
+            border-radius: 8px;
+            color: #fff;
+            font-size: .88rem;
+            font-weight: 650;
+            margin: .25rem 0 .25rem .5rem;
+            padding: .45rem .8rem;
+            transition: background .16s ease, border-color .16s ease;
+        }
+        .navbar-logout:hover,
+        .navbar-logout:focus-visible {
+            background: rgba(255, 255, 255, .16);
+            border-color: rgba(255, 255, 255, .5);
+            color: #fff;
+        }
+        .navbar-notifications { position: relative; }
+        .navbar-notifications-toggle {
+            align-items: center;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: #e6eef1;
+            display: inline-flex;
+            gap: .5rem;
+            margin: .2rem;
+            min-height: 40px;
+            padding: .45rem .7rem;
+        }
+        .navbar-notifications-toggle:hover,
+        .navbar-notifications-toggle:focus-visible {
+            background: rgba(255,255,255,.1);
+            border-color: rgba(255,255,255,.18);
+            color: #fff;
+        }
+        .navbar-notification-count {
+            align-items: center;
+            background: #e9eef1;
+            border-radius: 999px;
+            color: #173747;
+            display: inline-flex;
+            font-size: .7rem;
+            font-weight: 750;
+            justify-content: center;
+            min-width: 20px;
+            padding: .12rem .35rem;
+        }
+        .navbar-notifications-menu {
+            border: 1px solid #dfe7eb;
+            border-radius: 12px;
+            box-shadow: 0 14px 36px rgba(9, 43, 70, .16);
+            max-height: min(70vh, 460px);
+            overflow-y: auto;
+            padding: .45rem;
+            width: min(360px, calc(100vw - 2rem));
+        }
+        .navbar-notifications-heading {
+            align-items: center;
+            border-bottom: 1px solid #e8eef0;
+            color: #173747;
+            display: flex;
+            font-size: .86rem;
+            font-weight: 750;
+            justify-content: space-between;
+            padding: .65rem .7rem;
+        }
+        .navbar-notification-open {
+            background: transparent;
+            border: 0;
+            border-radius: 8px;
+            color: #294653;
+            display: block;
+            padding: .7rem;
+            text-align: left;
+            white-space: normal;
+            width: 100%;
+        }
+        .navbar-notification-open:hover,
+        .navbar-notification-open:focus-visible { background: #f2f5f7; }
+        .navbar-notification-open.unread { background: #f4f7f8; }
+        .navbar-notification-title { color: #173747; display: block; font-size: .82rem; font-weight: 750; }
+        .navbar-notification-message { color: #657983; display: block; font-size: .76rem; line-height: 1.4; margin-top: .2rem; }
+        .navbar-notification-time { color: #84939a; display: block; font-size: .69rem; margin-top: .35rem; }
+        .navbar-notification-all {
+            border-top: 1px solid #e8eef0;
+            display: block;
+            font-size: .82rem;
+            font-weight: 700;
+            margin-top: .35rem;
+            padding: .7rem;
+            text-align: center;
+            text-decoration: none;
+        }
+        @media (max-width: 991.98px) {
+            .navbar-logout { margin: .4rem 0; }
+        }
         .card {
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Soft shadow for cards */
             border: none;
@@ -26,9 +137,9 @@
 <body>
 
     <!-- Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-appraisal mb-4">
         <div class="container">
-            <a class="navbar-brand" href="#">Appraisal System</a>
+            <a class="navbar-brand" href="{% url 'home' %}">Appraisal System</a>
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -39,21 +150,67 @@
                     {% if user.is_authenticated %}
                         <!-- Show User Info and Logout -->
                         <li class="nav-item">
-                            <span class="nav-link text-light">
+                            <span class="navbar-user">
                                 <strong>{{ user.username }}</strong> 
                                 {% if user.profile.role %}
-                                    ({{ user.profile.role }})
+                                        <span>({{ user.profile.role }})</span>
                                 {% endif %}
                             </span>
+                        </li>
+                        <li class="nav-item dropdown navbar-notifications">
+                            <button
+                                class="navbar-notifications-toggle dropdown-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}"
+                            >
+                                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                <span>Notifications</span>
+                                {% if unread_notification_count %}
+                                    <span class="navbar-notification-count">{{ unread_notification_count }}</span>
+                                {% endif %}
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end navbar-notifications-menu">
+                                <div class="navbar-notifications-heading">
+                                    <span>Recent notifications</span>
+                                    {% if unread_notification_count %}
+                                        <span class="small text-muted">{{ unread_notification_count }} unread</span>
+                                    {% endif %}
+                                </div>
+                                {% for notification in navbar_notifications %}
+                                    <form action="{% url 'open_notification' notification.id %}" method="post">
+                                        {% csrf_token %}
+                                        <button
+                                            class="navbar-notification-open{% if not notification.is_read %} unread{% endif %}"
+                                            type="submit"
+                                        >
+                                            <span class="navbar-notification-title">{{ notification.title }}</span>
+                                            <span class="navbar-notification-message">{{ notification.message }}</span>
+                                            <span class="navbar-notification-time">{{ notification.created_at|timesince }} ago</span>
+                                        </button>
+                                    </form>
+                                {% empty %}
+                                    <p class="small text-muted mb-0 p-3">You have no notifications yet.</p>
+                                {% endfor %}
+                                <a class="navbar-notification-all" href="{% url 'notifications' %}">View all notifications</a>
+                            </div>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'profile' %}">My Profile</a>
                         </li>
-                        <!-- logout -->
-                       
+                        <li class="nav-item">
+                            <form action="{% url 'logout' %}" method="post">
+                                {% csrf_token %}
+                                <button class="navbar-logout" type="submit">Log out</button>
+                            </form>
+                        </li>
                     {% else %}
-                        <!-- Show Login if not logged in -->
-                        
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">Sign in</a>
+                        </li>
                     {% endif %}
                 </ul>
             </div>

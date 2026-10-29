@@ -1,0 +1,513 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Mathias Catholic Hospital Yeji staff appraisal system: supporting staff growth and quality care through clear, thoughtful performance reviews.">
+    <meta name="theme-color" content="#092b46">
+    <title>Staff Appraisal | Mathias Catholic Hospital, Yeji</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #102b3c;
+            --navy: #092b46;
+            --teal: #16b8a6;
+            --mint: #e9f8f5;
+            --muted: #647784;
+        }
+
+        html { scroll-behavior: smooth; }
+        body {
+            color: var(--ink);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            background: #fff;
+        }
+        a { text-decoration: none; }
+        .site-nav {
+            background: rgba(8, 35, 56, .94);
+            backdrop-filter: blur(14px);
+            left: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            z-index: 5;
+        }
+        .brand-mark {
+            align-items: center;
+            color: white;
+            display: inline-flex;
+            font-size: .88rem;
+            font-weight: 750;
+            gap: .75rem;
+            letter-spacing: .02em;
+        }
+        .brand-symbol {
+            align-items: center;
+            background: var(--teal);
+            border-radius: 13px;
+            color: var(--navy);
+            display: inline-flex;
+            font-size: 1.2rem;
+            height: 42px;
+            justify-content: center;
+            width: 42px;
+        }
+        .nav-link-custom {
+            color: rgba(255,255,255,.78);
+            font-size: .9rem;
+            font-weight: 600;
+            margin: 0 .65rem;
+        }
+        .nav-link-custom:hover { color: white; }
+        .btn-teal {
+            background: var(--teal);
+            border: 0;
+            border-radius: 999px;
+            color: #062d3a;
+            font-weight: 750;
+            padding: .8rem 1.35rem;
+            transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .btn-teal:hover {
+            background: #35d2bf;
+            box-shadow: 0 12px 28px rgba(22,184,166,.24);
+            color: #062d3a;
+            transform: translateY(-2px);
+        }
+        .hero {
+            align-items: center;
+            background: linear-gradient(110deg, rgba(5,31,54,.95) 0%, rgba(7,45,70,.83) 49%, rgba(7,43,62,.35) 100%),
+                url("{% static 'images/heroImage1.webp' %}") center 42% / cover;
+            color: white;
+            display: flex;
+            min-height: 690px;
+            overflow: hidden;
+            padding: 135px 0 100px;
+            position: relative;
+        }
+        .hero::after {
+            background: #fff;
+            border-radius: 50% 50% 0 0 / 42% 42% 0 0;
+            bottom: -92px;
+            content: "";
+            height: 130px;
+            left: -5%;
+            position: absolute;
+            transform: rotate(-1deg);
+            width: 110%;
+        }
+        .eyebrow {
+            color: #77ead9;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+        }
+        .hero h1 {
+            font-size: clamp(2.7rem, 6vw, 5.2rem);
+            font-weight: 780;
+            letter-spacing: -.055em;
+            line-height: 1.03;
+            margin: 1.15rem 0 1.3rem;
+            max-width: 740px;
+        }
+        .hero-copy {
+            color: rgba(255,255,255,.82);
+            font-size: clamp(1.02rem, 2vw, 1.22rem);
+            line-height: 1.75;
+            max-width: 570px;
+        }
+        .hero-note {
+            color: rgba(255,255,255,.7);
+            font-size: .88rem;
+            margin-top: 1.15rem;
+        }
+        .section-pad { padding: 100px 0; }
+        .section-kicker {
+            color: #139b8e;
+            font-size: .76rem;
+            font-weight: 800;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+        }
+        .section-title {
+            color: var(--navy);
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            font-weight: 760;
+            letter-spacing: -.04em;
+            line-height: 1.12;
+        }
+        .section-copy { color: var(--muted); line-height: 1.8; }
+        .photo-frame {
+            border-radius: 28px;
+            box-shadow: 0 24px 70px rgba(12,48,68,.16);
+            overflow: hidden;
+            position: relative;
+        }
+        .photo-frame img {
+            display: block;
+            height: 440px;
+            object-fit: cover;
+            width: 100%;
+        }
+        .photo-caption {
+            background: white;
+            border: 1px solid rgba(10,47,68,.08);
+            border-radius: 16px;
+            bottom: 20px;
+            box-shadow: 0 12px 32px rgba(10,47,68,.12);
+            left: 20px;
+            max-width: calc(100% - 40px);
+            padding: 1rem 1.15rem;
+            position: absolute;
+        }
+        .photo-caption strong { color: var(--navy); display: block; }
+        .photo-caption span { color: var(--muted); font-size: .86rem; }
+        .how-section { background: #f2faf9; }
+        .appraisal-timeline {
+            height: 390px;
+            margin: 1rem auto 0;
+            max-width: 1120px;
+            position: relative;
+        }
+        .timeline-curve {
+            height: 100%;
+            inset: 0;
+            overflow: visible;
+            position: absolute;
+            width: 100%;
+        }
+        .timeline-curve path {
+            fill: none;
+            stroke: #19b9a7;
+            stroke-linecap: round;
+            stroke-width: 5;
+        }
+        .timeline-stages {
+            height: 100%;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            position: relative;
+        }
+        .timeline-stage {
+            left: var(--stage-x);
+            position: absolute;
+            top: var(--stage-y);
+            transform: translate(-50%, -50%);
+            width: 230px;
+        }
+        .timeline-marker {
+            align-items: center;
+            background: #fff;
+            border: 5px solid #bcece5;
+            border-radius: 50%;
+            box-shadow: 0 8px 24px rgba(9, 43, 70, .12);
+            color: #087b74;
+            display: flex;
+            font-size: .87rem;
+            font-weight: 800;
+            height: 58px;
+            justify-content: center;
+            margin: 0 auto;
+            position: relative;
+            width: 58px;
+            z-index: 1;
+        }
+        .timeline-copy {
+            left: 50%;
+            position: absolute;
+            text-align: center;
+            transform: translateX(-50%);
+            width: 100%;
+        }
+        .timeline-stage:nth-child(odd) .timeline-copy { bottom: calc(100% + 17px); }
+        .timeline-stage:nth-child(even) .timeline-copy { top: calc(100% + 17px); }
+        .timeline-role {
+            color: #128f83;
+            display: block;
+            font-size: .72rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+            margin-bottom: .45rem;
+            text-transform: uppercase;
+        }
+        .timeline-copy h3 {
+            color: var(--navy);
+            font-size: 1.12rem;
+            font-weight: 760;
+            margin: 0 0 .45rem;
+        }
+        .timeline-copy p {
+            color: var(--muted);
+            font-size: .9rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+        .closing {
+            background: radial-gradient(circle at 85% 20%, rgba(22,184,166,.22), transparent 28%), var(--navy);
+            color: white;
+            overflow: hidden;
+            padding: 116px 0 76px;
+            position: relative;
+        }
+    
+        .closing .container { position: relative; }
+        .closing h2 {
+            font-size: clamp(2rem, 4vw, 3.35rem);
+            font-weight: 760;
+            letter-spacing: -.04em;
+        }
+        .closing p { color: rgba(255,255,255,.76); line-height: 1.75; max-width: 600px; }
+        footer {
+            background: #061e32;
+            color: rgba(255,255,255,.68);
+            padding: 72px 0 28px;
+            position: relative;
+        }
+        footer::before {
+            background: #061e32;
+            border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+            content: "";
+            height: 72px;
+            left: -5%;
+            position: absolute;
+            right: -5%;
+            top: -35px;
+        }
+        footer .container { position: relative; }
+        footer strong { color: white; }
+        .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s ease; }
+        .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+        @media (max-width: 767.98px) {
+            .site-nav { position: absolute; }
+            .hero { min-height: 650px; padding-top: 130px; }
+            .hero h1 { max-width: 560px; }
+            .section-pad { padding: 72px 0; }
+            .photo-frame img { height: 330px; }
+            .nav-link-custom { margin: .45rem 0; }
+            .appraisal-timeline { height: auto; margin: 2rem 0 0; }
+            .timeline-curve { display: none; }
+            .timeline-stages {
+                height: auto;
+                padding-left: 76px;
+            }
+            .timeline-stages::before {
+                background: linear-gradient(#19b9a7, #bcece5);
+                border-radius: 4px;
+                bottom: 30px;
+                content: "";
+                left: 27px;
+                position: absolute;
+                top: 28px;
+                width: 4px;
+            }
+            .timeline-stage {
+                left: auto;
+                margin-bottom: 2.1rem;
+                min-height: 66px;
+                position: relative;
+                top: auto;
+                transform: none;
+                width: auto;
+            }
+            .timeline-stage:last-child { margin-bottom: 0; }
+            .timeline-marker {
+                height: 54px;
+                left: -76px;
+                margin: 0;
+                position: absolute;
+                top: 0;
+                width: 54px;
+            }
+            .timeline-copy,
+            .timeline-stage:nth-child(odd) .timeline-copy,
+            .timeline-stage:nth-child(even) .timeline-copy {
+                left: auto;
+                position: static;
+                text-align: left;
+                transform: none;
+                width: auto;
+            }
+            .closing { padding-top: 96px; }
+            .closing::before { height: 48px; }
+            footer { padding-top: 60px; }
+            footer::before { height: 58px; top: -28px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            html { scroll-behavior: auto; }
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+            .reveal { opacity: 1; transform: none; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg site-nav">
+        <div class="container py-2">
+            <a class="brand-mark" href="{% url 'home' %}" aria-label="Mathias Catholic Hospital Yeji appraisal home">
+                <span class="brand-symbol" aria-hidden="true">✚</span>
+                <span>Mathias Catholic Hospital<br><small class="fw-normal opacity-75">YEJI · STAFF APPRAISAL</small></span>
+            </a>
+            <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#homeNav" aria-controls="homeNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="homeNav">
+                <div class="navbar-nav ms-auto align-items-lg-center py-3 py-lg-0">
+                    <a class="nav-link-custom" href="#purpose">Purpose</a>
+                    <a class="nav-link-custom" href="#process">How it works</a>
+                    <a class="btn btn-teal ms-lg-3 mt-2 mt-lg-0" href="{% url 'login' %}">Staff sign in <span aria-hidden="true">→</span></a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="container position-relative">
+                <div class="row">
+                    <div class="col-lg-9 col-xl-8 reveal">
+                        <div class="eyebrow">People growing. Better care together.</div>
+                        <h1>Recognising the people behind every act of care.</h1>
+                        <p class="hero-copy">
+                            A clear, supportive appraisal process for the dedicated staff of
+                            Mathias Catholic Hospital, Yeji.
+                        </p>
+                        <a class="btn btn-teal btn-lg mt-3" href="{% url 'login' %}">Access your appraisal <span aria-hidden="true">→</span></a>
+                        <p class="hero-note">A secure space for staff, supervisors, department heads and HR.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section-pad" id="purpose">
+            <div class="container">
+                <div class="row align-items-center g-5">
+                    <div class="col-lg-6 reveal">
+                        <div class="photo-frame">
+                            <img src="{% static 'images/staff-colla1.webp' %}" alt="Colleagues working together around a laptop" loading="lazy">
+                            <div class="photo-caption">
+                                <strong>Growth through teamwork</strong>
+                                <span>Clear goals. Helpful feedback. Better care.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 ps-lg-5 reveal">
+                        <div class="section-kicker mb-3">A people-centred approach</div>
+                        <h2 class="section-title mb-4">Good care begins with supported, growing staff.</h2>
+                        <p class="section-copy mb-4">
+                            This appraisal system helps every team member set meaningful goals,
+                            reflect on progress and receive constructive feedback throughout the
+                            review process.
+                        </p>
+                        <p class="section-copy mb-0">
+                            It brings employees, supervisors, department heads and HR together
+                            around a shared commitment to learning, accountability and quality
+                            service for our community.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section-pad how-section" id="process">
+            <div class="container">
+                <div class="row justify-content-center text-center mb-5 reveal">
+                    <div class="col-lg-8">
+                        <div class="section-kicker mb-3">A clear path forward</div>
+                        <h2 class="section-title mb-3">How the appraisal works</h2>
+                        <p class="section-copy mb-0">Each stage builds on the last, with clear responsibilities and constructive review.</p>
+                    </div>
+                </div>
+                <div class="appraisal-timeline reveal">
+                    <svg class="timeline-curve" viewBox="0 0 1200 320" preserveAspectRatio="none" aria-hidden="true">
+                        <path d="M 0 260 C 65 305 85 305 150 220 C 245 95 350 80 450 120 C 565 166 650 292 750 210 C 860 120 960 28 1050 70 C 1115 99 1155 65 1200 40"></path>
+                    </svg>
+                    <ol class="timeline-stages" aria-label="Appraisal review stages">
+                        <li class="timeline-stage" style="--stage-x: 12.5%; --stage-y: 68.75%;">
+                            <span class="timeline-marker" aria-hidden="true">01</span>
+                            <div class="timeline-copy">
+                                <span class="timeline-role">Your appraisal begins</span>
+                                <h3>Employee</h3>
+                                <p>Set work goals, record training and choose relevant competencies.</p>
+                            </div>
+                        </li>
+                        <li class="timeline-stage" style="--stage-x: 37.5%; --stage-y: 37.5%;">
+                            <span class="timeline-marker" aria-hidden="true">02</span>
+                            <div class="timeline-copy">
+                                <span class="timeline-role">Guidance and feedback</span>
+                                <h3>Supervisor</h3>
+                                <p>Review progress, score selected competencies and share feedback.</p>
+                            </div>
+                        </li>
+                        <li class="timeline-stage" style="--stage-x: 62.5%; --stage-y: 65.625%;">
+                            <span class="timeline-marker" aria-hidden="true">03</span>
+                            <div class="timeline-copy">
+                                <span class="timeline-role">Department review</span>
+                                <h3>Head of Department</h3>
+                                <p>Add a departmental perspective and support a fair review.</p>
+                            </div>
+                        </li>
+                        <li class="timeline-stage" style="--stage-x: 87.5%; --stage-y: 21.875%;">
+                            <span class="timeline-marker" aria-hidden="true">04</span>
+                            <div class="timeline-copy">
+                                <span class="timeline-role">Final approval</span>
+                                <h3>Human Resources</h3>
+                                <p>Complete the final review and confirm the appraisal outcome.</p>
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <section class="closing">
+            <div class="container">
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-8 reveal">
+                        <div class="eyebrow mb-3">Your next step</div>
+                        <h2 class="mb-3">Your contribution matters.</h2>
+                        <p class="mb-0">Sign in to set your goals, continue a review or support a colleague through their appraisal.</p>
+                    </div>
+                    <div class="col-lg-4 text-lg-end reveal">
+                        <a class="btn btn-teal btn-lg" href="{% url 'login' %}">Sign in to continue <span aria-hidden="true">→</span></a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <strong>Mathias Catholic Hospital, Yeji</strong>
+            <span>Staff Appraisal System · Supporting people who care for our community</span>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (() => {
+            const items = document.querySelectorAll('.reveal');
+            if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                items.forEach((item) => item.classList.add('is-visible'));
+                return;
+            }
+            const observer = new IntersectionObserver((entries, currentObserver) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-visible');
+                        currentObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12 });
+            items.forEach((item) => observer.observe(item));
+        })();
+    </script>
+</body>
+</html>

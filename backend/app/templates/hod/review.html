@@ -66,8 +66,22 @@
                             <strong>{{ comp.competency.name }}</strong>
                             <div><span class="badge bg-primary-subtle text-primary">{{ comp.competency.get_competency_type_display }}</span></div>
                         </td>
-                        <td>{% include 'appraisal/_competency_description.html' with competency=comp.competency %}</td>
-                        <td>{{ comp.end_year_score|default:"N/A" }} / 5</td>
+                        <td>
+                            <ul class="mb-0">
+                                {% for statement_score in comp.statement_scores.all %}
+                                    <li>{{ statement_score.statement }}</li>
+                                {% empty %}
+                                    <li>{% include 'appraisal/_competency_description.html' with competency=comp.competency %}</li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            {% for statement_score in comp.statement_scores.all %}
+                                <div>{{ statement_score.end_year_score|default:"N/A" }} / 5</div>
+                            {% empty %}
+                                {{ comp.end_year_score|default:"N/A" }} / 5
+                            {% endfor %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

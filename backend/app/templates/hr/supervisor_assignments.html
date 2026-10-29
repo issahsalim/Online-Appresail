@@ -8,6 +8,26 @@
     <div class="card mb-4">
         <div class="card-header">Assign or Change Supervisor</div>
         <div class="card-body">
+            {% if transfer_confirmation %}
+                <div class="alert alert-warning" role="alert">
+                    <strong>Confirm appraisal transfer</strong>
+                    <p class="mb-2">
+                        This will transfer {{ transfer_confirmation.appraisal_count }} in-progress
+                        appraisal(s) for {{ transfer_confirmation.employee_name }} to
+                        {{ transfer_confirmation.supervisor_name }}. Existing scores, comments,
+                        and return history will be preserved.
+                    </p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="department" value="{{ transfer_confirmation.department_id }}">
+                        <input type="hidden" name="employee" value="{{ transfer_confirmation.employee_id }}">
+                        <input type="hidden" name="supervisor" value="{{ transfer_confirmation.supervisor_id }}">
+                        <input type="hidden" name="confirm_transfer" value="1">
+                        <button type="submit" class="btn btn-warning">Confirm supervisor transfer</button>
+                        <a href="{% url 'hr_supervisor_assignments' %}" class="btn btn-secondary">Cancel</a>
+                    </form>
+                </div>
+            {% endif %}
             <form method="post">
                 {% csrf_token %}
                 {% for field in form %}
@@ -22,7 +42,9 @@
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
-                <button type="submit" class="btn btn-primary">Save Supervisor Assignment</button>
+                <button type="submit" class="btn btn-primary">
+                    {% if transfer_confirmation %}Edit assignment{% else %}Save Supervisor Assignment{% endif %}
+                </button>
                 <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary">Back to HR Dashboard</a>
             </form>
         </div>

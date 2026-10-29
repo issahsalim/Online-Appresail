@@ -3,6 +3,7 @@ from . import views
 from django.contrib.auth import views as auth_views
 
 urlpatterns = [
+    path('', views.home, name='home'),
     # ... your other urls ...
     path('employee/dashboard/', views.employee_dashboard, name='employee_dashboard'),
     path('employee/fill-targets/', views.fill_targets, name='fill_targets'),
@@ -11,6 +12,9 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('profile/', views.profile, name='profile'),
     path('profile/password/', views.change_password, name='password_change'),
+    path('notifications/', views.notifications, name='notifications'),
+    path('notifications/<int:notification_id>/open/', views.open_notification, name='open_notification'),
+    path('notifications/read-all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     path('supervisor/dashboard/', views.supervisor_dashboard, name='supervisor_dashboard'),
     path('supervisor/create-appraisals/', views.supervisor_create_appraisals, name='supervisor_create_appraisals'),
     path('supervisor/review/<int:appraisal_id>/', views.supervisor_review, name='supervisor_review'),

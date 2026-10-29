@@ -62,6 +62,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'app.context_processors.app_notifications',
             ],
         },
     },
@@ -129,5 +130,5 @@ MAILERS = {
 
 
 LOGIN_REDIRECT_URL = 'dashboard_router' # We will later make this smart to redirect to the right dashboard based on role
-LOGOUT_REDIRECT_URL = 'login'
+LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = 'login'

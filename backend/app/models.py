@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -50,6 +52,29 @@ class EmployeeProfile(models.Model):
     def __str__(self):
         dept = self.department.name if self.department else 'No Dept'
         return f"{self.user.username} - {self.role} ({dept})"
+
+
+class AppNotification(models.Model):
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='app_notifications',
+    )
+    title = models.CharField(max_length=120)
+    message = models.CharField(max_length=300)
+    url = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
+
+    @property
+    def is_read(self):
+        return self.read_at is not None
+
+    def __str__(self):
+        return f"{self.title} for {self.recipient}"
 
 
 class AssignSupervisor(models.Model):
@@ -160,7 +185,7 @@ class Appraisal(models.Model):
         null=True,
         blank=True,
         related_name='appraisals',
-    )
+    ) 
     employee_department_name = models.CharField(max_length=100, blank=True)
     employee_appointment_to_present_grade_date = models.DateField(null=True, blank=True)
     
@@ -191,23 +216,14 @@ class Appraisal(models.Model):
         return f"{self.employee.user.username} - {self.cycle.year} ({self.get_status_display()})"
 
     def calculate_final_score(self):
-        """Calculates the overall percentage and final rating."""
-        from django.db.models import Avg
-        
-        # 1. Calculate Average Target Score (Scale of 1-5)
-        target_avg = self.targets.aggregate(avg=Avg('end_year_score'))['avg'] or 0
-        
-        # 2. Calculate Average Competency Score (Scale of 1-5)
-        comp_avg = self.competency_scores.aggregate(avg=Avg('end_year_score'))['avg'] or 0
-        
-        # 3. Overall Average (Assuming 50% weight for targets, 50% for competencies for simplicity)
-        # You can adjust these weights based on the exact PDF formula.
-        overall_avg = (target_avg + comp_avg) / 2
-        
-        # 4. Convert to Percentage (Average 5 = 100%, Average 1 = 20%)
-        self.overall_percentage = (overall_avg / 5) * 100
-        
-        # 5. Assign Final Rating based on the PDF Scale
+        """Calculate M + N + O and convert the total to a percentage."""
+        self.validate_final_score_inputs()
+        breakdown = self.get_score_breakdown()
+        total = breakdown['total']
+        self.overall_percentage = (
+            total / Decimal('5') * Decimal('100')
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
         if self.overall_percentage >= 80:
             self.final_rating = "Outstanding"
         elif self.overall_percentage >= 65:
@@ -217,7 +233,143 @@ class Appraisal(models.Model):
         elif self.overall_percentage >= 41:
             self.final_rating = "Needs Improvement"
         else:
-            self.final_rating = "Unacceptable"
+            self.final_rating = "Unsatisfactory"
+
+    def get_score_breakdown(self):
+        """Return the target and selected-competency calculation for display."""
+        target_rows = list(self.targets.all())
+        target_scores = [target.end_year_score for target in target_rows]
+        targets_complete = bool(target_rows) and all(
+            score is not None for score in target_scores
+        )
+        target_total = (
+            sum(Decimal(score) for score in target_scores)
+            if targets_complete else None
+        )
+        target_average = (
+            target_total / len(target_rows) if targets_complete else None
+        )
+        target_component = (
+            target_average * Decimal('0.6')
+            if target_average is not None else None
+        )
+
+        groups = []
+        for competency_score in self.competency_scores.select_related(
+            'competency',
+        ).prefetch_related('statement_scores'):
+            weight = (
+                Decimal('0.3')
+                if competency_score.competency.competency_type == 'core'
+                else Decimal('0.1')
+            )
+            statements = list(competency_score.statement_scores.all())
+            if not statements and competency_score.end_year_score is not None:
+                statement_rows = [{
+                    'statement': 'Previously recorded competency score',
+                    'score': competency_score.end_year_score,
+                    'weighted_score': weight * Decimal(competency_score.end_year_score),
+                }]
+            else:
+                statement_rows = [
+                    {
+                        'statement': statement.statement,
+                        'score': statement.end_year_score,
+                        'weighted_score': (
+                            weight * Decimal(statement.end_year_score)
+                            if statement.end_year_score is not None else None
+                        ),
+                    }
+                    for statement in statements
+                ]
+
+            group_complete = bool(statement_rows) and all(
+                row['score'] is not None for row in statement_rows
+            )
+            group_total = (
+                sum(row['weighted_score'] for row in statement_rows)
+                if group_complete else None
+            )
+            group_average = (
+                group_total / len(statement_rows) if group_complete else None
+            )
+            groups.append({
+                'score': competency_score,
+                'competency': competency_score.competency,
+                'name': competency_score.competency.name,
+                'type': competency_score.competency.competency_type,
+                'type_display': competency_score.competency.get_competency_type_display(),
+                'weight': weight,
+                'statements': statement_rows,
+                'legacy': not statements and competency_score.end_year_score is not None,
+                'complete': group_complete,
+                'total': group_total,
+                'average': group_average,
+            })
+
+        core_groups = [group for group in groups if group['type'] == 'core']
+        non_core_groups = [group for group in groups if group['type'] == 'non_core']
+
+        def category_average(category_groups):
+            if not category_groups:
+                return Decimal('0')
+            if any(not group['complete'] for group in category_groups):
+                return None
+            return sum(group['average'] for group in category_groups) / len(category_groups)
+
+        core_component = category_average(core_groups)
+        non_core_component = category_average(non_core_groups)
+        complete = (
+            targets_complete
+            and bool(groups)
+            and all(group['complete'] for group in groups)
+        )
+        total = (
+            target_component + core_component + non_core_component
+            if complete else None
+        )
+        percentage = (
+            (total / Decimal('5') * Decimal('100')).quantize(
+                Decimal('0.01'),
+                rounding=ROUND_HALF_UP,
+            )
+            if total is not None else None
+        )
+
+        return {
+            'targets': target_rows,
+            'targets_complete': targets_complete,
+            'target_total': target_total,
+            'target_average': target_average,
+            'target_component': target_component,
+            'groups': groups,
+            'core_component': core_component,
+            'non_core_component': non_core_component,
+            'total': total,
+            'percentage': percentage,
+            'complete': complete,
+        }
+
+    def validate_final_score_inputs(self):
+        targets = list(self.targets.values_list('end_year_score', flat=True))
+        if not targets:
+            raise ValidationError('At least one target is required before scoring.')
+        if any(score is None for score in targets):
+            raise ValidationError('Score every target before submitting this appraisal.')
+
+        competency_scores = self.competency_scores.prefetch_related('statement_scores')
+        if not competency_scores.exists():
+            raise ValidationError('At least one competency statement must be selected.')
+        for competency_score in competency_scores:
+            statements = list(competency_score.statement_scores.all())
+            if not statements:
+                raise ValidationError(
+                    f'Select at least one statement for {competency_score.competency.name}.'
+                )
+            if any(statement.end_year_score is None for statement in statements):
+                raise ValidationError(
+                    f'Score every selected statement for {competency_score.competency.name}.'
+                )
 
 
 class AppraisalReturn(models.Model):
@@ -351,6 +503,33 @@ class AppraisalCompetencyScore(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['appraisal', 'competency'], name='unique_appraisal_competency')
         ]
+
+
+class AppraisalCompetencyStatementScore(models.Model):
+    competency_score = models.ForeignKey(
+        AppraisalCompetencyScore,
+        on_delete=models.CASCADE,
+        related_name='statement_scores',
+    )
+    statement_index = models.PositiveIntegerField()
+    statement = models.TextField()
+    end_year_score = models.IntegerField(
+        null=True, 
+        blank=True,  
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+
+    class Meta:
+        ordering = ['statement_index']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competency_score', 'statement_index'],
+                name='unique_competency_statement_score',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.competency_score.competency.name}: {self.statement}"
 
 
 # ==========================================

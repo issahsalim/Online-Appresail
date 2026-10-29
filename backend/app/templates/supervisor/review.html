@@ -24,7 +24,7 @@
     <form method="POST">
         {% csrf_token %}
 
-        {% if target_formset.errors or target_formset.non_form_errors or comp_formset.errors or comp_formset.non_form_errors %}
+        {% if target_formset.errors or target_formset.non_form_errors or comp_formset.errors or comp_formset.non_form_errors or statement_score_formset.errors or statement_score_formset.non_form_errors %}
             <div class="alert alert-danger" role="alert">
                 <strong>Scores were not saved.</strong> Please correct these errors and try again.
                 <ul class="mb-0 mt-2">
@@ -48,11 +48,21 @@
                             {% endfor %}
                         {% endfor %}
                     {% endfor %}
+                    {% for errors in statement_score_formset.errors %}
+                        {% for field, field_errors in errors.items %}
+                            {% for error in field_errors %}
+                                <li>Competency statement {{ forloop.parentloop.parentloop.counter }} — {{ field }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in statement_score_formset.non_form_errors %}
+                            <li>Competency statements: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
                 </ul>
             </div>
         {% endif %}
         
-        <div class="card mb-4">
+        <div class="card mb-4" id="targets-section">
             <div class="card-header bg-secondary text-white">Targets & Goals</div>
             <div class="card-body">
                 {{ target_formset.management_form }}
@@ -76,31 +86,91 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header bg-secondary text-white">Competencies</div>
+            <div class="card-header bg-secondary text-white">Selected Competency Statements</div>
             <div class="card-body">
                 {{ comp_formset.management_form }}
                 {{ comp_formset.non_form_errors }}
-                {% for form in comp_formset %}
-                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-                    {{ form.non_field_errors }}
-                    <div class="card mb-3 border-0 shadow-sm">
+                {{ statement_score_formset.management_form }}
+                {% for group in competency_groups %}
+                    <div
+                        class="card mb-4 border-0 shadow-sm competency-group"
+                        data-competency-group
+                        data-type="{{ group.type }}"
+                        data-weight="{{ group.weight }}"
+                    >
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>{{ group.form.instance.competency.name }}</strong>
+                            <span class="badge bg-primary-subtle text-primary">
+                                {{ group.form.instance.competency.get_competency_type_display }}
+                                (weight {{ group.weight }})
+                            </span>
+                        </div>
                         <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start gap-3">
-                                <h5 class="card-title">{{ form.instance.competency.name }}</h5>
-                                <span class="badge bg-primary-subtle text-primary">{{ form.instance.competency.get_competency_type_display }}</span>
-                            </div>
-                            <div class="text-muted mb-3">{% include 'appraisal/_competency_description.html' with competency=form.instance.competency %}</div>
-                            <div class="row g-3">
-                                {% for field in form.visible_fields %}
+                            {% for hidden in group.form.hidden_fields %}{{ hidden }}{% endfor %}
+                            {{ group.form.non_field_errors }}
+                            <div class="row g-3 mb-3">
+                                {% for field in group.form.visible_fields %}
                                     <div class="col-md-4">
                                         {{ field.label_tag }} {{ field }}
                                         {{ field.errors }}
                                     </div>
                                 {% endfor %}
                             </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Selected statement</th>
+                                            <th>Weight</th>
+                                            <th>Grade (1-5)</th>
+                                            <th>W × G</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for statement_form in group.statements %}
+                                            <tr data-statement-row data-weight="{{ group.weight }}">
+                                                <td>
+                                                    {% for hidden in statement_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                    {{ statement_form.instance.statement }}
+                                                    {{ statement_form.end_year_score.errors }}
+                                                </td>
+                                                <td>{{ group.weight }}</td>
+                                                <td>{{ statement_form.end_year_score }}</td>
+                                                <td><span data-weighted-score>—</span></td>
+                                            </tr>
+                                        {% empty %}
+                                            <tr><td colspan="4" class="text-muted">No statements were selected.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th colspan="3">Group total</th>
+                                            <td data-group-total>—</td>
+                                        </tr>
+                                        <tr>
+                                            <th colspan="3">Group average (total ÷ selected statements)</th>
+                                            <td data-group-average>—</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}
+            </div>
+        </div>
+
+        <div class="card mb-4 border-primary" id="live-calculation">
+            <div class="card-header bg-primary text-white">Live Overall Assessment</div>
+            <div class="card-body">
+                <p class="mb-2"><strong>Q — Total target scores:</strong> <span data-total="Q">—</span></p>
+                <p class="mb-2"><strong>A — Target average (Q ÷ number of targets):</strong> <span data-total="A">—</span></p>
+                <p class="mb-2"><strong>M — A × 0.6:</strong> <span data-total="M">—</span></p>
+                <p class="mb-2"><strong>N — Average of core competency group averages:</strong> <span data-total="N">—</span></p>
+                <p class="mb-2"><strong>O — Average of non-core competency group averages:</strong> <span data-total="O">—</span></p>
+                <p class="mb-2"><strong>T — M + N + O:</strong> <span data-total="T">—</span></p>
+                <p class="mb-0"><strong>Overall percentage — T ÷ 5 × 100:</strong> <span data-total="percentage">—</span></p>
+                <small class="text-muted">The final total is available when all targets and selected competency statements have scores.</small>
             </div>
         </div>
 
@@ -124,4 +194,112 @@
         </div>
     </form>
 </div>
-{% endblock %} 
+<script>
+    (function () {
+        const format = value => value.toFixed(2).replace(/\.00$/, '');
+        const setText = (element, value) => {
+            if (element) element.textContent = value;
+        };
+        const targetInputs = Array.from(
+            document.querySelectorAll('#targets-section input[name$="-end_year_score"]'),
+        );
+        const scoreInputs = Array.from(
+            document.querySelectorAll('[data-statement-row] input[type="radio"]'),
+        );
+
+        function updateCalculation() {
+            const groupAverages = { core: [], non_core: [] };
+            document.querySelectorAll('[data-competency-group]').forEach(group => {
+                const weight = Number(group.dataset.weight);
+                const rows = Array.from(group.querySelectorAll('[data-statement-row]'));
+                const weightedScores = [];
+
+                rows.forEach(row => {
+                    const selected = row.querySelector('input[type="radio"]:checked');
+                    const score = selected ? Number(selected.value) : null;
+                    const weighted = score !== null && Number.isFinite(score) ? weight * score : null;
+                    setText(
+                        row.querySelector('[data-weighted-score]'),
+                        weighted === null ? '—' : format(weighted),
+                    );
+                    if (weighted !== null) weightedScores.push(weighted);
+                });
+
+                const totalElement = group.querySelector('[data-group-total]');
+                const averageElement = group.querySelector('[data-group-average]');
+                if (weightedScores.length === rows.length && rows.length > 0) {
+                    const total = weightedScores.reduce((sum, value) => sum + value, 0);
+                    const average = total / rows.length;
+                    setText(totalElement, format(total));
+                    setText(averageElement, format(average));
+                    groupAverages[group.dataset.type].push(average);
+                } else {
+                    setText(totalElement, `Pending (${weightedScores.length}/${rows.length} scored)`);
+                    setText(averageElement, 'Pending');
+                    groupAverages[group.dataset.type].push(null);
+                }
+            });
+
+            const targetScores = targetInputs.map(input => {
+                const score = Number(input.value);
+                return input.value !== '' && Number.isFinite(score) ? score : null;
+            });
+            const scoredTargets = targetScores.filter(score => score !== null);
+            const targetComplete = targetScores.length > 0 && scoredTargets.length === targetScores.length;
+            const targetTotal = targetComplete
+                ? scoredTargets.reduce((sum, value) => sum + value, 0)
+                : null;
+            const targetAverage = targetComplete
+                ? targetTotal / scoredTargets.length
+                : null;
+            const targetValue = targetAverage === null ? null : targetAverage * 0.6;
+            const competencyValue = values => {
+                if (values.length === 0) return 0;
+                if (values.some(value => value === null)) return null;
+                return values.reduce((sum, value) => sum + value, 0) / values.length;
+            };
+            const coreValue = competencyValue(groupAverages.core);
+            const nonCoreValue = competencyValue(groupAverages.non_core);
+
+            setText(
+                document.querySelector('[data-total="Q"]'),
+                targetTotal === null
+                    ? `Pending (${scoredTargets.length}/${targetScores.length} targets scored)`
+                    : format(targetTotal),
+            );
+            setText(
+                document.querySelector('[data-total="A"]'),
+                targetAverage === null
+                    ? `Pending (${scoredTargets.length}/${targetScores.length} targets scored)`
+                    : format(targetAverage),
+            );
+            setText(
+                document.querySelector('[data-total="M"]'),
+                targetValue === null
+                    ? `Pending (${scoredTargets.length}/${targetScores.length} targets scored)`
+                    : format(targetValue),
+            );
+            setText(
+                document.querySelector('[data-total="N"]'),
+                coreValue === null ? 'Pending (score all selected core statements)' : format(coreValue),
+            );
+            setText(
+                document.querySelector('[data-total="O"]'),
+                nonCoreValue === null ? 'Pending (score all selected non-core statements)' : format(nonCoreValue),
+            );
+
+            const complete = targetValue !== null && coreValue !== null && nonCoreValue !== null;
+            const total = complete ? targetValue + coreValue + nonCoreValue : null;
+            setText(document.querySelector('[data-total="T"]'), total === null ? 'Pending' : format(total));
+            setText(
+                document.querySelector('[data-total="percentage"]'),
+                total === null ? 'Pending' : `${format(total / 5 * 100)}%`,
+            );
+        };
+
+        targetInputs.forEach(input => input.addEventListener('input', updateCalculation));
+        scoreInputs.forEach(input => input.addEventListener('change', updateCalculation));
+        updateCalculation();
+    }());
+</script>
+{% endblock %}

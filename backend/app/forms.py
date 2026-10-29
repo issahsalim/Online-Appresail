@@ -6,6 +6,7 @@ from .models import (
     AppraisalTraining,
     AppraisalTarget,
     AppraisalCompetencyScore,
+    AppraisalCompetencyStatementScore,
     Competency,
     Department,
     EmployeeProfile,
@@ -262,13 +263,36 @@ class EmployeeCompetencySelectionForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         help_text="Select the competencies that apply to your role.",
     )
+    competency_statements = forms.MultipleChoiceField(
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['competencies'].queryset = Competency.objects.order_by(
+        competencies = Competency.objects.order_by(
             'competency_type',
             'name',
         )
+        self.fields['competencies'].queryset = competencies
+        self.competency_groups = [
+            {
+                'competency': competency,
+                'statements': [
+                    {
+                        'value': f'{competency.id}:{index}',
+                        'text': statement,
+                    }
+                    for index, statement in enumerate(competency.description_items)
+                ],
+            }
+            for competency in competencies
+        ]
+        self.fields['competency_statements'].choices = [
+            (statement['value'], f"{group['competency'].name}: {statement['text']}")
+            for group in self.competency_groups
+            for statement in group['statements']
+        ]
 
 
 # ==========================================
@@ -287,7 +311,16 @@ class SupervisorCompetencyForm(forms.ModelForm):
     class Meta:
         model = AppraisalCompetencyScore
         # Supervisor scores the competencies
-        fields = ['mid_year_progress', 'mid_year_remark', 'end_year_score']
+        fields = ['mid_year_progress', 'mid_year_remark']
+
+
+class SupervisorCompetencyStatementForm(forms.ModelForm):
+    class Meta:
+        model = AppraisalCompetencyStatementScore
+        fields = ['end_year_score']
+        widgets = {
+            'end_year_score': forms.RadioSelect(choices=[(i, str(i)) for i in range(1, 6)]),
+        }
         widgets = {
             # Render end_year_score as radio buttons (1 to 5) instead of a dropdown
             'end_year_score': forms.RadioSelect(choices=[(i, str(i)) for i in range(1, 6)]),
@@ -340,4 +373,10 @@ SupervisorCompetencyFormSet = forms.inlineformset_factory(
     form=SupervisorCompetencyForm, 
     extra=0, 
     can_delete=False
+)
+
+SupervisorCompetencyStatementFormSet = forms.modelformset_factory(
+    AppraisalCompetencyStatementScore,
+    form=SupervisorCompetencyStatementForm,
+    extra=0,
 )

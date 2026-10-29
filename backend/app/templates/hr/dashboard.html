@@ -1,15 +1,546 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5">
-    <h2>HR Dashboard</h2>
-    <p class="text-muted">Welcome, {{ request.user.username }}. Final Approval Queue.</p>
-    <a href="{% url 'hr_supervisor_assignments' %}" class="btn btn-primary mb-3">
-        Assign or Change Supervisors
-    </a>
-    <hr>
+<div class="hr-dashboard-shell">
+    <style>
+        body:has(.hr-dashboard-shell) > .container {
+            max-width: none;
+            padding: 0;
+            width: 100%;
+        }
+        .hr-dashboard-shell {
+            background: #f2f5f7;
+            display: flex;
+            min-height: calc(100vh - 64px);
+        }
+        .hr-dashboard-sidebar {
+            background: #142d3c;
+            color: #fff;
+            flex: 0 0 248px;
+            min-height: calc(100vh - 64px);
+            padding: 1.5rem 1rem;
+            position: sticky;
+            top: 0;
+            align-self: flex-start;
+        }
+        .hr-sidebar-brand {
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,.12);
+            color: white;
+            display: flex;
+            font-size: .98rem;
+            font-weight: 750;
+            gap: .7rem;
+            line-height: 1.25;
+            margin: 0 .45rem 1.5rem;
+            padding: .25rem 0 1.25rem;
+        }
+        .hr-sidebar-mark {
+            align-items: center;
+            background: #20c3b1;
+            border-radius: 11px;
+            color: #103448;
+            display: inline-flex;
+            flex: 0 0 38px;
+            height: 38px;
+            justify-content: center;
+        }
+        .hr-sidebar-label {
+            color: #8fa5b1;
+            font-size: .68rem;
+            font-weight: 750;
+            letter-spacing: .12em;
+            margin: 1.2rem .7rem .55rem;
+            text-transform: uppercase;
+        }
+        .hr-sidebar-nav { display: grid; gap: .55rem; }
+        .hr-sidebar-link {
+            align-items: center;
+            background: transparent;
+            border: 0;
+            border-radius: 13px;
+            color: #c4d2d9;
+            display: flex;
+            font-size: .9rem;
+            font-weight: 600;
+            gap: .8rem;
+            min-height: 58px;
+            padding: .65rem .75rem;
+            text-align: left;
+            text-decoration: none;
+            transition: background .18s ease, color .18s ease, transform .18s ease;
+            width: 100%;
+        }
+        .hr-sidebar-link:hover,
+        .hr-sidebar-link.active {
+            background: #214457;
+            color: #fff;
+        }
+        .hr-sidebar-link:hover { transform: translateX(2px); }
+        .hr-sidebar-link.active {
+            background: linear-gradient(110deg, #214e5c, #1b3b4d);
+            box-shadow: inset 3px 0 #27c8b5, 0 8px 20px rgba(4, 22, 32, .12);
+        }
+        .hr-sidebar-icon {
+            align-items: center;
+            background: rgba(99, 221, 207, .1);
+            border: 1px solid rgba(99, 221, 207, .12);
+            border-radius: 10px;
+            color: #63ddcf;
+            display: inline-flex;
+            flex: 0 0 36px;
+            font-size: 1rem;
+            height: 36px;
+            justify-content: center;
+            text-align: center;
+        }
+        .hr-sidebar-link.active .hr-sidebar-icon { background: rgba(39, 200, 181, .2); }
+        .hr-sidebar-link-copy { display: grid; gap: .14rem; min-width: 0; }
+        .hr-sidebar-link-title { color: inherit; font-size: .86rem; font-weight: 700; line-height: 1.2; }
+        .hr-sidebar-link-note { color: #91a9b5; font-size: .68rem; font-weight: 450; line-height: 1.2; }
+        .hr-sidebar-link.active .hr-sidebar-link-note { color: #b2d2d3; }
+        .hr-sidebar-count {
+            align-items: center;
+            background: rgba(39, 200, 181, .14);
+            border: 1px solid rgba(99, 221, 207, .2);
+            border-radius: 999px;
+            color: #83e7dc;
+            display: inline-flex;
+            font-size: .7rem;
+            font-weight: 750;
+            justify-content: center;
+            margin-left: auto;
+            min-width: 27px;
+            padding: .22rem .48rem;
+        }
+        .hr-dashboard-content { flex: 1; min-width: 0; padding: clamp(1.25rem, 3vw, 2.5rem); }
+        .hr-dashboard-header {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .hr-dashboard-header h2 { color: #092b46; font-weight: 750; letter-spacing: -.03em; }
+        .hr-overview {
+            background: #f1f5f7;
+            border: 1px solid #e6ecef;
+            border-radius: 24px;
+            margin-bottom: 2.5rem;
+            padding: clamp(1rem, 2vw, 1.5rem);
+        }
+        .hr-overview-top {
+            align-items: end;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: space-between;
+            margin-bottom: 1.25rem;
+        }
+        .hr-overview-top h3 { color: #092b46; font-size: 1.25rem; font-weight: 750; margin: 0; }
+        .hr-overview-top p { color: #71818b; font-size: .88rem; margin: .35rem 0 0; }
+        .hr-dashboard-filters { align-items: end; display: flex; flex-wrap: wrap; gap: .65rem; }
+        .hr-dashboard-filters label { color: #526672; display: block; font-size: .72rem; font-weight: 700; margin-bottom: .25rem; }
+        .hr-dashboard-filters select { background-color: #fff; border-color: #dce5e9; min-width: 145px; }
+        .hr-metric {
+            background: #fff;
+            border: 1px solid #e9eff2;
+            border-radius: 16px;
+            height: 100%;
+            padding: 1rem 1.1rem;
+        }
+        .hr-metric-label { color: #72828b; display: block; font-size: .78rem; font-weight: 650; }
+        .hr-metric-value { color: #092b46; display: block; font-size: 1.8rem; font-weight: 780; line-height: 1.2; margin-top: .3rem; }
+        .hr-metric-note { color: #159787; display: block; font-size: .75rem; margin-top: .25rem; }
+        .hr-chart-card {
+            background: #fff;
+            border: 1px solid #e9eff2;
+            border-radius: 18px;
+            height: 100%;
+            padding: 1.1rem 1.2rem;
+        }
+        .hr-chart-heading { align-items: start; display: flex; justify-content: space-between; margin-bottom: .8rem; }
+        .hr-chart-heading h4 { color: #16374a; font-size: .98rem; font-weight: 750; margin: 0; }
+        .hr-chart-heading p { color: #829099; font-size: .78rem; margin: .3rem 0 0; }
+        .hr-chart-wrap { height: 260px; position: relative; }
+        .hr-chart-wrap.department-chart { height: 300px; }
+        .hr-chart-empty { align-items: center; color: #71818b; display: flex; height: 100%; justify-content: center; text-align: center; }
+        .hr-dashboard-section[hidden] { display: none !important; }
+        .hr-section-heading { margin: .25rem 0 1.4rem; }
+        .hr-section-heading h3 { color: #092b46; font-size: 1.45rem; font-weight: 750; margin-bottom: .3rem; }
+        .hr-section-heading p { color: #71818b; margin: 0; }
+        .hr-table-card {
+            background: #fff;
+            border: 1px solid #e4ebef;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .hr-table-card .table { margin-bottom: 0; }
+        .hr-role-form { align-items: center; display: flex; gap: .6rem; min-width: 260px; }
+        .hr-role-form .form-select { min-width: 150px; }
+        .hr-role-save { white-space: nowrap; }
+        .hr-sidebar-toggle { display: none; }
+        .hr-role-search { margin-bottom: 1rem; max-width: 420px; }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) { animation: hr-section-enter .28s ease both; }
+        .hr-section-heading {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e1e7eb;
+            border-radius: 18px;
+            box-shadow: 0 8px 22px rgba(20, 45, 60, .04);
+            margin: 0 0 1.25rem;
+            padding: 1.25rem 1.4rem;
+        }
+        .hr-section-heading h3 { color: #142d3c; font-size: 1.35rem; letter-spacing: -.025em; margin-bottom: .35rem; }
+        .hr-section-heading p { color: #697e88; font-size: .9rem; line-height: 1.5; max-width: 760px; }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .hr-table-card,
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) > .table-responsive {
+            border: 1px solid #e2eaed;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(20, 45, 60, .055);
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .table {
+            color: #294653;
+            vertical-align: middle;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .table thead th {
+            background: #173747;
+            border-bottom: 0;
+            color: #eaf4f5;
+            font-size: .73rem;
+            font-weight: 750;
+            letter-spacing: .055em;
+            padding: .9rem 1rem;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .table tbody td {
+            border-color: #edf1f2;
+            padding: .85rem 1rem;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .table tbody tr:hover { background: #f5f7f9; }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .form-control,
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .form-select {
+            border-color: #d5e1e4;
+            border-radius: 10px;
+            color: #173747;
+            min-height: 43px;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .form-control:focus,
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .form-select:focus {
+            border-color: #547181;
+            box-shadow: 0 0 0 .2rem rgba(23, 63, 80, .1);
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .btn {
+            border-radius: 9px;
+            font-weight: 700;
+            transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .btn:hover { transform: translateY(-1px); }
+        .hr-action-primary {
+            background: #173f50;
+            border: 1px solid #173f50;
+            color: #fff;
+        }
+        .hr-action-primary:hover,
+        .hr-action-primary:focus { background: #20596a; border-color: #20596a; color: #fff; }
+        .hr-action-accent {
+            background: #edf2f5;
+            border: 1px solid #d7e0e5;
+            color: #23495b;
+        }
+        .hr-action-accent:hover,
+        .hr-action-accent:focus { background: #e1e9ed; border-color: #c4d2d9; color: #173747; }
+        .hr-assignment-card {
+            background: #fff;
+            border: 1px solid #e1eaed;
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(20, 45, 60, .055);
+            overflow: hidden;
+        }
+        .hr-assignment-card-heading {
+            align-items: center;
+            background: #f4f8f9;
+            border-bottom: 1px solid #e5edef;
+            color: #173747;
+            display: flex;
+            font-size: .95rem;
+            font-weight: 750;
+            gap: .65rem;
+            padding: 1rem 1.25rem;
+        }
+        .hr-assignment-card-heading span {
+            align-items: center;
+            background: #e9eef1;
+            border-radius: 9px;
+            color: #23495b;
+            display: inline-flex;
+            height: 32px;
+            justify-content: center;
+            width: 32px;
+        }
+        .hr-assignment-card-body { padding: 1.25rem; }
+        .hr-assignment-card .form-label { color: #365461; font-size: .82rem; font-weight: 700; }
+        .hr-search-status {
+            align-items: center;
+            color: #647b85;
+            display: flex;
+            font-size: .84rem;
+            gap: .5rem;
+            min-height: 34px;
+        }
+        .hr-search-status::before {
+            background: #547181;
+            border-radius: 50%;
+            content: "";
+            height: 7px;
+            width: 7px;
+        }
+        .hr-transfer-confirmation {
+            background: #f5f7f8;
+            border: 1px solid #dce4e8;
+            border-left: 4px solid #547181;
+            border-radius: 12px;
+            color: #294653;
+            padding: 1rem 1.1rem;
+        }
+        .hr-transfer-confirmation strong { color: #173f50; display: block; margin-bottom: .4rem; }
+        .hr-form-errors {
+            background: #fff3ef;
+            border: 1px solid #f2c7bd;
+            border-radius: 10px;
+            color: #8a3f30;
+            padding: .8rem 1rem;
+        }
+        .hr-field-error { color: #8a3f30; font-size: .82rem; margin-top: .3rem; }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .pagination { gap: .35rem; }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .page-link {
+            background: #fff;
+            border: 1px solid #dce7e9;
+            border-radius: 8px;
+            color: #245263;
+            min-width: 38px;
+            text-align: center;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .page-item.active .page-link {
+            background: #173f50;
+            border-color: #173f50;
+            color: #fff;
+        }
+        .hr-dashboard-section:not([data-dashboard-section="overview"]) .page-link:focus {
+            box-shadow: 0 0 0 .2rem rgba(23, 63, 80, .1);
+        }
+        @keyframes hr-section-enter {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 767.98px) {
+            .hr-dashboard-shell { display: block; }
+            .hr-dashboard-sidebar { min-height: 0; padding: .8rem 1rem; position: static; }
+            .hr-sidebar-brand { border: 0; justify-content: space-between; margin: 0; padding: 0; }
+            .hr-sidebar-toggle { align-items: center; background: #214457; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; color: #fff; display: inline-flex; gap: .45rem; padding: .45rem .7rem; }
+            .hr-sidebar-label { display: none; }
+            .hr-sidebar-nav { display: none; gap: .45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .8rem; }
+            .hr-dashboard-sidebar.is-expanded .hr-sidebar-nav { display: grid; }
+            .hr-sidebar-link { gap: .5rem; min-height: 54px; min-width: 0; padding: .5rem; white-space: normal; width: auto; }
+            .hr-sidebar-link:hover { transform: none; }
+            .hr-sidebar-link-title { font-size: .76rem; }
+            .hr-sidebar-link-note { display: none; }
+            .hr-sidebar-icon { flex-basis: 32px; height: 32px; }
+            .hr-sidebar-link.active { box-shadow: inset 0 0 0 1px rgba(39, 200, 181, .25); }
+            .hr-dashboard-content { padding: 1.1rem; }
+            .hr-dashboard-filters { width: 100%; }
+            .hr-dashboard-filters > div { flex: 1 1 140px; }
+            .hr-dashboard-filters select { width: 100%; }
+            .hr-chart-wrap { height: 240px; }
+            .hr-section-heading { border-radius: 15px; padding: 1rem; }
+            .hr-assignment-card-body { padding: 1rem; }
+            .hr-dashboard-section:not([data-dashboard-section="overview"]) .table thead th,
+            .hr-dashboard-section:not([data-dashboard-section="overview"]) .table tbody td { padding: .72rem; }
+        }
+    </style>
 
+    <aside class="hr-dashboard-sidebar" aria-label="HR dashboard navigation">
+        <div class="hr-sidebar-brand">
+            <span class="hr-sidebar-mark" aria-hidden="true">✚</span>
+            <span>Mathias Catholic Hospital<br><small class="fw-normal opacity-75">HR WORKSPACE</small></span>
+            <button
+                class="hr-sidebar-toggle"
+                type="button"
+                aria-controls="hr-dashboard-navigation"
+                aria-expanded="false"
+            >
+                <span aria-hidden="true">☰</span> Menu
+            </button>
+        </div>
+        <div class="hr-sidebar-label">Workspace</div>
+        <nav class="hr-sidebar-nav" id="hr-dashboard-navigation">
+            <button class="hr-sidebar-link active" type="button" data-dashboard-target="overview">
+                <span class="hr-sidebar-icon" aria-hidden="true">▦</span>
+                <span class="hr-sidebar-link-copy"><span class="hr-sidebar-link-title">Overview</span></span>
+            </button>
+            <button class="hr-sidebar-link" type="button" data-dashboard-target="pending">
+                <span class="hr-sidebar-icon" aria-hidden="true">◷</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Pending approvals</span>
+                    <span class="hr-sidebar-link-note">Reviews waiting for HR</span>
+                </span>
+                <span class="hr-sidebar-count">{{ pending_reviews|length }}</span>
+            </button>
+            <button class="hr-sidebar-link" type="button" data-dashboard-target="completed">
+                <span class="hr-sidebar-icon" aria-hidden="true">✓</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Completed appraisals</span>
+                    <span class="hr-sidebar-link-note">Search finalized reviews</span>
+                </span>
+            </button>
+            <button class="hr-sidebar-link" type="button" data-dashboard-target="roles">
+                <span class="hr-sidebar-icon" aria-hidden="true">♙</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Change user role</span>
+                    <span class="hr-sidebar-link-note">Manage staff access</span>
+                </span>
+            </button>
+            <button class="hr-sidebar-link" type="button" data-dashboard-target="assignments">
+                <span class="hr-sidebar-icon" aria-hidden="true">⇄</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Supervisor assignments</span>
+                    <span class="hr-sidebar-link-note">Manage reporting lines</span>
+                </span>
+            </button>
+        </nav>
+        <div class="hr-sidebar-label">Signed in</div>
+        <div class="small px-2 text-white-50">{{ request.user.username }}</div>
+    </aside>
+
+    <main class="hr-dashboard-content">
+    <div class="hr-dashboard-header">
+        <div>
+            <h2 class="mb-1">HR Dashboard</h2>
+            <p class="text-muted mb-0">Welcome, {{ request.user.username }}. Manage appraisal progress and reviews.</p>
+        </div>
+    </div>
+
+    <section class="hr-dashboard-section" data-dashboard-section="overview" aria-label="Appraisal overview">
+    <section class="hr-overview" aria-labelledby="hr-overview-title">
+        <div class="hr-overview-top">
+            <div>
+                <h3 id="hr-overview-title">Appraisal analytics</h3>
+                <p>
+                    {% if dashboard_filters.cycle %}
+                        Cycle {{ dashboard_filters.cycle }}
+                    {% else %}
+                        All appraisal cycles
+                    {% endif %}
+                    · Summary by workflow stage and department
+                </p>
+            </div>
+            <form method="get" class="hr-dashboard-filters">
+                <div>
+                    <label for="analytics-cycle">Appraisal cycle</label>
+                    <select class="form-select form-select-sm" id="analytics-cycle" name="cycle">
+                        <option value="">All cycles</option>
+                        {% for cycle in cycles %}
+                            <option value="{{ cycle.year }}" {% if dashboard_filters.cycle == cycle.year %}selected{% endif %}>
+                                {{ cycle.year }}{% if cycle.is_active %} · Active{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="analytics-department">Department</label>
+                    <select class="form-select form-select-sm" id="analytics-department" name="department">
+                        <option value="">All departments</option>
+                        {% for department in departments %}
+                            <option value="{{ department.id }}" {% if dashboard_filters.department == department.id|stringformat:"s" %}selected{% endif %}>
+                                {{ department.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-dark" type="submit">Apply</button>
+            </form>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-xl-3">
+                <div class="hr-metric">
+                    <span class="hr-metric-label">Total appraisals</span>
+                    <strong class="hr-metric-value">{{ dashboard_counts.total }}</strong>
+                    <span class="hr-metric-note">In selected scope</span>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="hr-metric">
+                    <span class="hr-metric-label">Awaiting supervisor / HOD</span>
+                    <strong class="hr-metric-value">{{ dashboard_counts.supervisor|add:dashboard_counts.hod }}</strong>
+                    <span class="hr-metric-note">Reviews in progress</span>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="hr-metric">
+                    <span class="hr-metric-label">Pending HR approval</span>
+                    <strong class="hr-metric-value">{{ dashboard_counts.hr }}</strong>
+                    <span class="hr-metric-note">Ready for your review</span>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="hr-metric">
+                    <span class="hr-metric-label">Completed</span>
+                    <strong class="hr-metric-value">{{ dashboard_counts.completed }}</strong>
+                    <span class="hr-metric-note">Finalized and locked</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <div class="hr-chart-card">
+                    <div class="hr-chart-heading">
+                        <div>
+                            <h4>Workflow status</h4>
+                            <p>Appraisals at each review stage</p>
+                        </div>
+                    </div>
+                    <div class="hr-chart-wrap">
+                        <canvas id="workflow-chart" role="img" aria-label="Bar chart showing appraisals by workflow stage"></canvas>
+                        <p class="visually-hidden">
+                            {% for stage in workflow_chart %}{{ stage.label }}: {{ stage.count }}. {% endfor %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="hr-chart-card">
+                    <div class="hr-chart-heading">
+                        <div>
+                            <h4>Completion by department</h4>
+                            <p>Completed compared with not yet completed</p>
+                        </div>
+                    </div>
+                    <div class="hr-chart-wrap department-chart">
+                        <canvas id="department-chart" role="img" aria-label="Stacked bar chart comparing appraisal completion by department"></canvas>
+                        {% if not department_chart %}
+                            <div class="hr-chart-empty">No appraisal data for this selection.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {{ workflow_chart|json_script:"workflow-chart-data" }}
+        {{ department_chart|json_script:"department-chart-data" }}
+    </section>
+    </section>
+
+    <section class="hr-dashboard-section" data-dashboard-section="pending" aria-label="Pending HR approvals" hidden>
+    <div class="hr-section-heading">
+        <h3>Pending HR approvals</h3>
+        <p>Review appraisals submitted by department heads.</p>
+    </div>
+
+    <div class="hr-table-card table-responsive">
     <table class="table table-hover bg-white shadow-sm">
-        <thead class="table-dark">
+        <thead>
             <tr>
                 <th>Employee</th>
                 <th>Department</th>
@@ -26,20 +557,27 @@
                 <td>{{ appraisal.supervisor.user.username }}</td>
                 <td>{{ appraisal.hod.user.username }}</td>
                 <td>
-                    <a href="{% url 'hr_approve' appraisal.id %}" class="btn btn-sm btn-success">Review & Approve</a>
+                    <a href="{% url 'hr_approve' appraisal.id %}" class="btn btn-sm hr-action-primary">Review &amp; Approve</a>
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center">No appraisals pending HR approval right now.</td>
+                <td colspan="5" class="text-center py-5">
+                    <strong class="d-block text-body">You’re all caught up</strong>
+                    <span class="small text-muted">No appraisals are waiting for HR approval.</span>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </div>
+    </section>
 
-    <hr class="my-5">
+    <section class="hr-dashboard-section" data-dashboard-section="completed" aria-label="Completed appraisals" hidden>
+    <div class="hr-section-heading">
     <h3>Completed Appraisals</h3>
     <p class="text-muted">Completed appraisals are locked for HR. Use the superuser Django admin only when a correction is required.</p>
+    </div>
     <div class="row g-3 mb-3">
         <div class="col-md-6">
             <label for="completed-search" class="form-label">Search completed appraisals</label>
@@ -73,7 +611,7 @@
     <p id="completed-search-status" class="text-muted" role="status" aria-live="polite">Loading completed appraisals...</p>
     <div class="table-responsive">
         <table class="table table-hover bg-white shadow-sm">
-            <thead class="table-dark">
+            <thead>
                 <tr>
                     <th>Employee (Staff ID)</th>
                     <th>Department</th>
@@ -91,12 +629,118 @@
     <nav aria-label="Completed appraisal results">
         <ul id="completed-pagination" class="pagination"></ul>
     </nav>
-</div>  
+    </section>
 
-<h1>Change User Role</h1>
-<form action="{% url 'hr_dashboard' %}" method="post">
-    {% csrf_token %}
-    <div class="table-responsive">
+    <section
+        class="hr-dashboard-section"
+        data-dashboard-section="assignments"
+        data-has-errors="{% if transfer_confirmation or supervisor_assignment_form.errors %}true{% else %}false{% endif %}"
+        aria-label="Supervisor assignments"
+        hidden
+    >
+        <div class="hr-section-heading">
+            <h3>Supervisor Assignments</h3>
+            <p>Assign employees to supervisors within the same department and manage existing reporting lines.</p>
+        </div>
+        <div class="hr-assignment-card mb-4">
+            <div class="hr-assignment-card-heading"><span aria-hidden="true">⇄</span>Assign or Change Supervisor</div>
+            <div class="hr-assignment-card-body">
+                {% if transfer_confirmation %}
+                    <div class="hr-transfer-confirmation mb-3" role="alert">
+                        <strong>Confirm appraisal transfer</strong>
+                        <p class="mb-2">
+                            This will transfer {{ transfer_confirmation.appraisal_count }} in-progress
+                            appraisal(s) for {{ transfer_confirmation.employee_name }} to
+                            {{ transfer_confirmation.supervisor_name }}. Existing scores, comments,
+                            and return history will be preserved.
+                        </p>
+                        <button class="btn hr-action-accent mb-3" type="button" id="confirm-assignment-transfer">
+                            Confirm supervisor transfer
+                        </button>
+                    </div>
+                {% endif %}
+                <form method="post" action="{% url 'hr_dashboard' %}" id="hr-dashboard-assignment-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="assignment_action" value="save">
+                    <input type="hidden" name="confirm_transfer" id="assignment-confirm-transfer" value="">
+                    {% for field in supervisor_assignment_form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <div class="hr-field-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                    {% if supervisor_assignment_form.non_field_errors %}
+                        <div class="hr-form-errors">{{ supervisor_assignment_form.non_field_errors }}</div>
+                    {% endif %}
+                    <button type="submit" class="btn hr-action-primary">Save Supervisor Assignment</button>
+                </form>
+            </div>
+        </div>
+
+        <h4>Current Assignments</h4>
+        <div class="row g-3 mb-3">
+            <div class="col-md-7">
+                <label for="dashboard-assignment-search" class="form-label">Search assignments</label>
+                <input
+                    id="dashboard-assignment-search"
+                    type="search"
+                    class="form-control"
+                    placeholder="Staff ID, employee, supervisor, or department"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="col-md-5">
+                <label for="dashboard-assignment-department" class="form-label">Filter by department</label>
+                <select id="dashboard-assignment-department" class="form-select">
+                    <option value="">All departments</option>
+                    {% for department in departments %}
+                        <option value="{{ department.id }}">{{ department.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <p id="dashboard-assignment-status" class="hr-search-status" role="status" aria-live="polite">Loading assignments...</p>
+        <div class="hr-table-card table-responsive">
+            <table class="table table-hover bg-white">
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th>Employee</th>
+                        <th>Supervisor</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboard-assignment-results"></tbody>
+            </table>
+        </div>
+        <nav aria-label="Supervisor assignment results">
+            <ul id="dashboard-assignment-pagination" class="pagination mt-3"></ul>
+        </nav>
+    </section>
+
+    <section class="hr-dashboard-section" data-dashboard-section="roles" aria-label="Change user roles" hidden>
+<div class="hr-section-heading">
+<h3>Change User Role</h3>
+<p class="text-muted">
+    Before removing a supervisor role, reassign their employees and transfer any appraisals
+    awaiting supervisor review from the Supervisor Assignments page.
+</p>
+    </div>
+    <div class="hr-role-search">
+        <label class="form-label fw-semibold" for="role-user-search">Find a user</label>
+        <input
+            class="form-control"
+            id="role-user-search"
+            type="search"
+            placeholder="Search by name, username, or role"
+            autocomplete="off"
+        >
+        <p class="small text-muted mb-0 mt-2" id="role-user-search-status" role="status" aria-live="polite"></p>
+    </div>
+    <div class="hr-table-card table-responsive">
         <table class="table table-hover bg-white shadow-sm">
             <thead>
                 <tr>
@@ -107,24 +751,36 @@
             </thead>
             <tbody>
                 {% for user_profile in users %}
-                    <tr>
-                        <td>{{ user_profile.user.username }}</td>
+                    <tr data-role-user-row>
+                        <td>
+                            <strong>{{ user_profile.user.get_full_name|default:user_profile.user.username }}</strong>
+                            <div class="small text-muted">{{ user_profile.user.username }}</div>
+                        </td>
                         <td>{{ user_profile.get_role_display }}</td>
-                        <td> 
-                            <label class="visually-hidden" for="role-{{ user_profile.id }}">
-                                Role for {{ user_profile.user.username }}
-                            </label> 
-                            <select  
-                                id="role-{{ user_profile.id }}"
-                                name="role_{{ user_profile.id }}"
-                                class="form-select"
-                            > 
-                                {% for role_value, role_label in role_choices %}
-                                    <option value="{{ role_value }}" {% if user_profile.role == role_value %}selected{% endif %}>
-                                        {{ role_label }}
-                                    </option> 
-                                {% endfor %}
-                            </select> 
+                        <td>
+                            <form action="{% url 'hr_dashboard' %}" method="post" class="hr-role-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_section" value="roles">
+                                <label class="visually-hidden" for="role-{{ user_profile.id }}">
+                                    New role for {{ user_profile.user.username }}
+                                </label>
+                                <select
+                                    id="role-{{ user_profile.id }}"
+                                    name="role_{{ user_profile.id }}"
+                                    class="form-select"
+                                >
+                                    {% for role_value, role_label in role_choices %}
+                                        <option value="{{ role_value }}" {% if user_profile.role == role_value %}selected{% endif %}>
+                                            {{ role_label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <button
+                                    type="submit"
+                                    class="btn btn-sm hr-action-primary hr-role-save"
+                                    aria-label="Save role for {{ user_profile.user.username }}"
+                                >Save</button>
+                            </form>
                         </td> 
                     </tr>
                 {% empty %}
@@ -135,10 +791,345 @@
             </tbody>
         </table>           
     </div>
-    <button type="submit" class="btn btn-primary">Save Role Changes</button>
-</form>
+    </section>
+    </main>
+</div>
 
 <script>
+    (() => {
+        const sidebar = document.querySelector('.hr-dashboard-sidebar');
+        const sidebarToggle = document.querySelector('.hr-sidebar-toggle');
+        const navigationButtons = [...document.querySelectorAll('[data-dashboard-target]')];
+        const sections = [...document.querySelectorAll('[data-dashboard-section]')];
+        if (!navigationButtons.length || !sections.length) return;
+
+        sidebarToggle?.addEventListener('click', () => {
+            const expanded = sidebar.classList.toggle('is-expanded');
+            sidebarToggle.setAttribute('aria-expanded', String(expanded));
+        });
+
+        function showSection(sectionName, updateHistory) {
+            const target = sections.find((section) => section.dataset.dashboardSection === sectionName);
+            if (!target) return;
+
+            sections.forEach((section) => {
+                section.hidden = section !== target;
+            });
+            navigationButtons.forEach((button) => {
+                const active = button.dataset.dashboardTarget === sectionName;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-current', active ? 'page' : 'false');
+            });
+            if (window.matchMedia('(max-width: 767.98px)').matches && sidebar.classList.contains('is-expanded')) {
+                sidebar.classList.remove('is-expanded');
+                sidebarToggle?.setAttribute('aria-expanded', 'false');
+            }
+
+            if (sectionName === 'overview' && window.hrDashboardCharts) {
+                window.hrDashboardCharts.forEach((chart) => chart.resize());
+            }
+            if (updateHistory) {
+                window.history.pushState(null, '', `#${sectionName}`);
+            }
+        }
+
+        navigationButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                showSection(button.dataset.dashboardTarget, true);
+            });
+        });
+        window.addEventListener('popstate', () => {
+            const assignmentSection = document.querySelector('[data-dashboard-section="assignments"]');
+            const initialSection = window.location.hash.slice(1)
+                || (assignmentSection?.dataset.hasErrors === 'true' ? 'assignments' : 'overview');
+            showSection(initialSection, false);
+        });
+        showSection(window.location.hash.slice(1) || 'overview', false);
+    })();
+</script>
+
+<script>
+    (() => {
+        const form = document.getElementById('hr-dashboard-assignment-form');
+        const departmentSelect = document.getElementById('id_department');
+        const employeeSelect = document.getElementById('id_employee');
+        const supervisorSelect = document.getElementById('id_supervisor');
+        const searchInput = document.getElementById('dashboard-assignment-search');
+        const departmentFilter = document.getElementById('dashboard-assignment-department');
+        const resultsBody = document.getElementById('dashboard-assignment-results');
+        const statusElement = document.getElementById('dashboard-assignment-status');
+        const pagination = document.getElementById('dashboard-assignment-pagination');
+        if (!form || !departmentSelect || !employeeSelect || !supervisorSelect) return;
+
+        const optionsUrl = "{% url 'hr_assignment_options' %}";
+        const searchUrl = "{% url 'hr_search_supervisor_assignments' %}";
+        const initialEmployee = employeeSelect.value;
+        const initialSupervisor = supervisorSelect.value;
+        let searchTimer;
+        let activeSearch;
+
+        function resetSelect(select, placeholder) {
+            select.replaceChildren(new Option(placeholder, ''));
+        }
+
+        async function loadOptions(preserveEmployee, preserveSupervisor) {
+            const departmentId = departmentSelect.value;
+            resetSelect(employeeSelect, 'Select an employee');
+            resetSelect(supervisorSelect, 'Select a supervisor');
+            employeeSelect.disabled = true;
+            supervisorSelect.disabled = true;
+            if (!departmentId) return;
+
+            const params = new URLSearchParams({ department_id: departmentId });
+            if (preserveEmployee) params.set('employee_id', preserveEmployee);
+            try {
+                const response = await fetch(`${optionsUrl}?${params.toString()}`);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Could not load department employees and supervisors.');
+                data.employees.forEach((employee) => employeeSelect.add(new Option(employee.label, employee.id)));
+                data.supervisors.forEach((supervisor) => supervisorSelect.add(new Option(supervisor.label, supervisor.id)));
+                if (preserveEmployee) employeeSelect.value = preserveEmployee;
+                if (preserveSupervisor) supervisorSelect.value = preserveSupervisor;
+                else if (data.current_supervisor_id) supervisorSelect.value = data.current_supervisor_id;
+            } catch (error) {
+                window.alert(error.message);
+            } finally {
+                employeeSelect.disabled = false;
+                supervisorSelect.disabled = false;
+            }
+        }
+
+        departmentSelect.addEventListener('change', () => loadOptions('', ''));
+        employeeSelect.addEventListener('change', () => loadOptions(employeeSelect.value, ''));
+        if (departmentSelect.value) {
+            loadOptions(initialEmployee, initialSupervisor);
+        } else {
+            resetSelect(employeeSelect, 'Select a department first');
+            resetSelect(supervisorSelect, 'Select a department first');
+            employeeSelect.disabled = true;
+            supervisorSelect.disabled = true;
+        }
+
+        function renderPagination(data) {
+            pagination.replaceChildren();
+            if (data.pages <= 1) return;
+            const addPageButton = (label, page, disabled, active) => {
+                const item = document.createElement('li');
+                item.className = `page-item${disabled ? ' disabled' : ''}${active ? ' active' : ''}`;
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'page-link';
+                button.textContent = label;
+                button.disabled = disabled;
+                button.addEventListener('click', () => searchAssignments(page));
+                item.append(button);
+                pagination.append(item);
+            };
+            addPageButton('Previous', data.page - 1, !data.has_previous, false);
+            for (let page = Math.max(1, data.page - 2); page <= Math.min(data.pages, data.page + 2); page += 1) {
+                addPageButton(String(page), page, false, page === data.page);
+            }
+            addPageButton('Next', data.page + 1, !data.has_next, false);
+        }
+
+        function renderAssignments(data) {
+            resultsBody.replaceChildren();
+            if (!data.results.length) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 4;
+                cell.className = 'text-center';
+                cell.textContent = 'No matching supervisor assignments found.';
+                row.append(cell);
+                resultsBody.append(row);
+                return;
+            }
+            data.results.forEach((assignment) => {
+                const row = document.createElement('tr');
+                [
+                    assignment.department,
+                    `${assignment.employee_staff_id} - ${assignment.employee_name}`,
+                    `${assignment.supervisor_staff_id} - ${assignment.supervisor_name}`,
+                ].forEach((value) => {
+                    const cell = document.createElement('td');
+                    cell.textContent = value;
+                    row.append(cell);
+                });
+                const actionCell = document.createElement('td');
+                const editButton = document.createElement('button');
+                editButton.type = 'button';
+                editButton.className = 'btn btn-sm hr-action-accent';
+                editButton.textContent = 'Change';
+                editButton.addEventListener('click', async () => {
+                    departmentSelect.value = assignment.department_id;
+                    await loadOptions(String(assignment.employee_id), String(assignment.supervisor_id));
+                    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+                actionCell.append(editButton);
+                row.append(actionCell);
+                resultsBody.append(row);
+            });
+        }
+
+        async function searchAssignments(page) {
+            if (activeSearch) activeSearch.abort();
+            activeSearch = new AbortController();
+            const params = new URLSearchParams({
+                q: searchInput.value,
+                department: departmentFilter.value,
+                page: String(page || 1),
+            });
+            statusElement.textContent = 'Searching assignments...';
+            try {
+                const response = await fetch(`${searchUrl}?${params.toString()}`, {
+                    signal: activeSearch.signal,
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'Could not search supervisor assignments.');
+                renderAssignments(data);
+                renderPagination(data);
+                statusElement.textContent = `${data.total} assignment${data.total === 1 ? '' : 's'} found.`;
+            } catch (error) {
+                if (error.name === 'AbortError') return;
+                resultsBody.replaceChildren();
+                pagination.replaceChildren();
+                statusElement.textContent = error.message;
+            }
+        }
+
+        searchInput.addEventListener('input', () => {
+            window.clearTimeout(searchTimer);
+            searchTimer = window.setTimeout(() => searchAssignments(1), 250);
+        });
+        departmentFilter.addEventListener('change', () => searchAssignments(1));
+        searchAssignments(1);
+
+        document.getElementById('confirm-assignment-transfer')?.addEventListener('click', () => {
+            document.getElementById('assignment-confirm-transfer').value = '1';
+            form.requestSubmit();
+        });
+    })();
+</script>
+
+<script>
+    (() => {
+        const searchInput = document.getElementById('role-user-search');
+        const status = document.getElementById('role-user-search-status');
+        const userRows = [...document.querySelectorAll('[data-role-user-row]')];
+        if (!searchInput || !status) return;
+
+        function filterUsers() {
+            const query = searchInput.value.trim().toLocaleLowerCase();
+            let visibleCount = 0;
+            userRows.forEach((row) => {
+                const matches = row.textContent.toLocaleLowerCase().includes(query);
+                row.hidden = !matches;
+                if (matches) visibleCount += 1;
+            });
+
+            status.textContent = query && visibleCount === 0
+                ? 'No users match your search.'
+                : `Showing ${visibleCount} of ${userRows.length} user${userRows.length === 1 ? '' : 's'}.`;
+        }
+
+        searchInput.addEventListener('input', filterUsers);
+        filterUsers();
+    })();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    (() => {
+        const workflowNode = document.getElementById('workflow-chart-data');
+        const departmentNode = document.getElementById('department-chart-data');
+        if (!workflowNode || !departmentNode) return;
+
+        const workflow = JSON.parse(workflowNode.textContent);
+        const departments = JSON.parse(departmentNode.textContent);
+        const workflowCanvas = document.getElementById('workflow-chart');
+        const departmentCanvas = document.getElementById('department-chart');
+        const showChartError = (canvas, message) => {
+            const notice = document.createElement('p');
+            notice.className = 'hr-chart-empty';
+            notice.setAttribute('role', 'status');
+            notice.textContent = message;
+            canvas.replaceWith(notice);
+        };
+
+        if (typeof Chart === 'undefined') {
+            showChartError(workflowCanvas, 'Charts could not load. Check your connection and refresh the page.');
+            if (departments.length) {
+                showChartError(departmentCanvas, 'Charts could not load. Check your connection and refresh the page.');
+            }
+            return;
+        }
+
+        Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+        Chart.defaults.color = '#71818b';
+        const charts = [new Chart(workflowCanvas, {
+            type: 'bar',
+            data: {
+                labels: workflow.map((stage) => stage.label),
+                datasets: [{
+                    data: workflow.map((stage) => stage.count),
+                    backgroundColor: ['#9ccbc8', '#27b8a7', '#3489bd', '#efb84b', '#e88975', '#17466a'],
+                    borderRadius: 6,
+                    maxBarThickness: 28,
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: (context) => ` ${context.parsed.x} appraisal${context.parsed.x === 1 ? '' : 's'}` } },
+                },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#edf2f4' } },
+                    y: { grid: { display: false } },
+                },
+            },
+        })];
+
+        if (departments.length) charts.push(new Chart(departmentCanvas, {
+            type: 'bar',
+            data: {
+                labels: departments.map((department) => department.name),
+                datasets: [
+                    {
+                        label: 'Completed',
+                        data: departments.map((department) => department.completed),
+                        backgroundColor: '#19b9a7',
+                        borderRadius: 5,
+                    },
+                    {
+                        label: 'In progress',
+                        data: departments.map((department) => department.in_progress),
+                        backgroundColor: '#c7d5dc',
+                        borderRadius: 5,
+                    },
+                ],
+            },
+            options: {
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 18 } },
+                    tooltip: { callbacks: { label: (context) => ` ${context.dataset.label}: ${context.parsed.x}` } },
+                },
+                scales: {
+                    x: { beginAtZero: true, stacked: true, ticks: { precision: 0 }, grid: { color: '#edf2f4' } },
+                    y: { stacked: true, grid: { display: false } },
+                },
+            },
+        }));
+        window.hrDashboardCharts = charts;
+    })();
+</script>
+
+<script>
+
     (function () {
         const searchInput = document.getElementById('completed-search');
         const departmentSelect = document.getElementById('completed-department');
@@ -205,7 +1196,7 @@
 
                 const actionCell = document.createElement('td');
                 const viewLink = document.createElement('a');
-                viewLink.className = 'btn btn-sm btn-outline-primary';
+                viewLink.className = 'btn btn-sm hr-action-accent';
                 viewLink.href = appraisal.view_url;
                 viewLink.textContent = 'View';
                 actionCell.append(viewLink);
@@ -254,4 +1245,5 @@
         searchCompleted(1);
     })();
 </script>
+
 {% endblock %}

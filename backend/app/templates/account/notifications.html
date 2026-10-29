@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+
+{% block title %}Notifications | Staff Appraisal System{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-md-5">
+    <style>
+        .notifications-page { color: #294653; margin: 0 auto; max-width: 920px; }
+        .notifications-header {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 16px;
+            box-shadow: 0 8px 22px rgba(20, 45, 60, .04);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding: 1.2rem 1.35rem;
+        }
+        .notifications-header h1 { color: #142d3c; font-size: 1.55rem; font-weight: 780; letter-spacing: -.03em; margin: 0 0 .25rem; }
+        .notifications-header p { color: #6c7f89; font-size: .88rem; margin: 0; }
+        .notifications-mark-all {
+            background: #edf2f5;
+            border: 1px solid #d7e0e5;
+            border-radius: 8px;
+            color: #23495b;
+            font-size: .82rem;
+            font-weight: 700;
+            padding: .55rem .8rem;
+        }
+        .notifications-mark-all:hover { background: #e1e9ed; }
+        .notifications-list { background: #fff; border: 1px solid #e0e8ec; border-radius: 16px; box-shadow: 0 10px 28px rgba(20, 45, 60, .04); overflow: hidden; }
+        .notification-row { align-items: start; border-bottom: 1px solid #edf1f3; display: flex; gap: .9rem; padding: 1rem 1.15rem; }
+        .notification-row:last-child { border-bottom: 0; }
+        .notification-row.unread { background: #f5f7f8; }
+        .notification-indicator { background: #c8d2d8; border-radius: 50%; flex: 0 0 9px; height: 9px; margin-top: .4rem; }
+        .notification-row.unread .notification-indicator { background: #23495b; }
+        .notification-content { flex: 1; min-width: 0; }
+        .notification-content button { background: none; border: 0; color: inherit; padding: 0; text-align: left; width: 100%; }
+        .notification-content button:hover .notification-title { text-decoration: underline; }
+        .notification-title { color: #173747; display: block; font-size: .92rem; font-weight: 750; }
+        .notification-message { color: #627781; display: block; font-size: .86rem; line-height: 1.5; margin-top: .22rem; }
+        .notification-time { color: #84939a; display: block; font-size: .74rem; margin-top: .38rem; }
+        .notifications-empty { color: #72828b; padding: 3rem 1.5rem; text-align: center; }
+        .notifications-pagination { display: flex; gap: .35rem; justify-content: center; margin-top: 1rem; }
+        .notifications-pagination a,
+        .notifications-pagination span {
+            background: #fff;
+            border: 1px solid #dce7e9;
+            border-radius: 8px;
+            color: #23495b;
+            font-size: .84rem;
+            padding: .45rem .7rem;
+            text-decoration: none;
+        }
+        .notifications-pagination .current { background: #173f50; border-color: #173f50; color: #fff; }
+    </style>
+
+    <main class="notifications-page">
+        <header class="notifications-header">
+            <div>
+                <h1>Notifications</h1>
+                <p>
+                    {% if unread_notification_count %}
+                        You have {{ unread_notification_count }} unread notification{{ unread_notification_count|pluralize }}.
+                    {% else %}
+                        You are all caught up.
+                    {% endif %}
+                </p>
+            </div>
+            {% if unread_notification_count %}
+                <form action="{% url 'mark_all_notifications_read' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="notifications-mark-all">Mark all as read</button>
+                </form>
+            {% endif %}
+        </header>
+
+        <section class="notifications-list" aria-label="Your notifications">
+            {% for notification in notification_page %}
+                <article class="notification-row{% if not notification.is_read %} unread{% endif %}">
+                    <span class="notification-indicator" aria-hidden="true"></span>
+                    <div class="notification-content">
+                        <form action="{% url 'open_notification' notification.id %}" method="post">
+                            {% csrf_token %}
+                            <button type="submit">
+                                <span class="notification-title">{{ notification.title }}</span>
+                                <span class="notification-message">{{ notification.message }}</span>
+                                <span class="notification-time">{{ notification.created_at|date:"M j, Y, P" }}</span>
+                            </button>
+                        </form>
+                    </div>
+                </article>
+            {% empty %}
+                <div class="notifications-empty">
+                    <strong class="d-block text-body mb-1">No notifications yet</strong>
+                    <span>Important appraisal and account updates will appear here.</span>
+                </div>
+            {% endfor %}
+        </section>
+
+        {% if notification_page.has_other_pages %}
+            <nav class="notifications-pagination" aria-label="Notification pages">
+                {% if notification_page.has_previous %}
+                    <a href="?page={{ notification_page.previous_page_number }}">Previous</a>
+                {% endif %}
+                <span class="current">Page {{ notification_page.number }} of {{ notification_page.paginator.num_pages }}</span>
+                {% if notification_page.has_next %}
+                    <a href="?page={{ notification_page.next_page_number }}">Next</a>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </main>
+</div>
+{% endblock %}

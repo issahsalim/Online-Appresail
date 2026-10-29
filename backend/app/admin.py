@@ -13,7 +13,8 @@ from .models import (
     AppraisalTraining,
     AppraisalReturn,
     AppraisalTarget,
-    AppraisalCompetencyScore
+    AppraisalCompetencyScore,
+    AppraisalCompetencyStatementScore,
 )
 
 # ==========================================
@@ -148,10 +149,11 @@ class AppraisalCompetencyScoreInline(admin.TabularInline):
     model = AppraisalCompetencyScore
     extra = 0
     autocomplete_fields = ['competency']
+    fields = ('competency', 'mid_year_progress', 'mid_year_remark')
 
     def get_readonly_fields(self, request, obj=None):
         if obj and obj.status == 'completed' and not request.user.is_superuser:
-            return [field.name for field in self.model._meta.fields]
+            return self.fields
         return super().get_readonly_fields(request, obj)
 
     def has_add_permission(self, request, obj=None):
@@ -163,6 +165,33 @@ class AppraisalCompetencyScoreInline(admin.TabularInline):
         if obj and obj.status == 'completed' and not request.user.is_superuser:
             return False
         return super().has_delete_permission(request, obj)
+
+
+@admin.register(AppraisalCompetencyStatementScore)
+class AppraisalCompetencyStatementScoreAdmin(admin.ModelAdmin):
+    list_display = ('statement', 'competency_score', 'end_year_score')
+    list_filter = (
+        'competency_score__competency__competency_type',
+        'competency_score__appraisal__status',
+    )
+    search_fields = (
+        'statement',
+        'competency_score__competency__name',
+        'competency_score__appraisal__employee__user__username',
+    )
+    list_select_related = (
+        'competency_score__competency',
+        'competency_score__appraisal__employee__user',
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        if (
+            obj
+            and obj.competency_score.appraisal.status == 'completed'
+            and not request.user.is_superuser
+        ):
+            return [field.name for field in self.model._meta.fields]
+        return super().get_readonly_fields(request, obj)
 
 
 class AppraisalReturnInline(admin.TabularInline):

@@ -7,6 +7,8 @@
 
     {% if read_only %}
         {% include 'appraisal/_employee_details.html' %}
+    {% else %}
+        {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
     {% endif %}
 
     {% if return_history %}
@@ -44,33 +46,98 @@
         {% endfor %}
 
         <h3>Competency Review</h3>
-        {% for score in competencies %}
+        {% for group in score_breakdown.groups %}
+            {% with score=group.score %}
             <div class="card mb-3 border-0 shadow-sm">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                         <h5 class="card-title mb-0">{{ score.competency.name }}</h5>
                         <span class="badge bg-primary-subtle text-primary">{{ score.competency.get_competency_type_display }}</span>
                     </div>
-                    <div class="text-muted mb-3">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</div>
+                    <div class="table-responsive mb-3">
+                        <table class="table table-bordered align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Selected statement</th>
+                                    <th>Weight</th>
+                                    <th>End-year score (1-5)</th>
+                                    <th>W × G</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for statement in group.statements %}
+                                    <tr>
+                                        <td>{{ statement.statement }}</td>
+                                        <td>{{ group.weight|floatformat:"1" }}</td>
+                                        <td><strong>End-year score:</strong> {{ statement.score|default:"Not scored yet" }}</td>
+                                        <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                        <tr>
+                                            <th colspan="3">Group total</th>
+                                            <td>{{ group.total|floatformat:2|default_if_none:"Pending" }}</td>
+                                        </tr>
+                                        <tr>
+                                            <th colspan="3">Group average</th>
+                                            <td>{{ group.average|floatformat:2|default_if_none:"Pending" }}</td>
+                                        </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    {% if group.legacy %}
+                        <div class="text-muted mb-3">
+                            {% include 'appraisal/_competency_description.html' with competency=group.competency %}
+                        </div>
+                    {% endif %}
                     <div class="row g-2">
                         <div class="col-md-4"><strong>Mid-year progress:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</div>
                         <div class="col-md-4"><strong>Mid-year remark:</strong> {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</div>
-                        <div class="col-md-4"><strong>End-year score:</strong> {{ score.end_year_score|default:"Not scored yet" }}</div>
                     </div>
                 </div>
             </div>
+            {% endwith %}
         {% empty %}
             <p>No competency reviews have been added to this appraisal.</p>
         {% endfor %}
 
+
+        
         {% include 'appraisal/_training.html' %}
 
         <h3>Review Comments and Final Result</h3>
         <p><strong>Supervisor:</strong> {{ appraisal.supervisor_comments|default:"No comments yet." }}</p>
         <p><strong>HOD:</strong> {{ appraisal.hod_comments|default:"No comments yet." }}</p>
         <p><strong>HR:</strong> {{ appraisal.hr_comments|default:"No comments yet." }}</p>
-        <p><strong>Overall percentage:</strong> {{ appraisal.overall_percentage|default:"Not calculated yet" }}</p>
         <p><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
+
+          <div class="card mb-4 border-primary">
+            <div class="card-header text-center">Overall Score Calculation</div>
+            <div class="card-body">
+                <p><strong>Q — Total target scores:</strong> {{ score_breakdown.target_total|floatformat:2|default_if_none:"Pending" }}</p>
+                <p><strong>A — Target average (Q ÷ number of targets):</strong> {{ score_breakdown.target_average|floatformat:2|default_if_none:"Pending" }}</p>
+                <p><strong>M — A × 0.6:</strong> {{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</p>
+                <p><strong>N — Average of core competency group averages:</strong> {{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</p>
+                <p><strong>O — Average of non-core competency group averages:</strong> {{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</p>
+                <p><strong>T — M + N + O:</strong> {{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</p>
+                <p class="mb-0"><strong>Overall percentage — T ÷ 5 × 100:</strong>
+                    {% if score_breakdown.percentage is not None %}
+                        {{ score_breakdown.percentage|floatformat:2 }}%
+                    {% else %}
+                        Pending scores
+                    {% endif %}
+                </p>
+                {% if not score_breakdown.complete %}
+                    <small class="text-muted">The final total appears once all targets and selected competency statements are scored.</small>
+                {% endif %}
+            </div>
+        </div>
+
     {% else %}
         <form method="POST">
             {% csrf_token %}
@@ -142,29 +209,37 @@
                 <div class="card-header bg-secondary text-white">Select Competencies</div>
                 <div class="card-body">
                     <p>{{ competency_form.competencies.help_text }}</p>
-                    {{ competency_form.competencies.errors }}
+                    {% for error in competency_form.competency_statements.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
                     <div class="row g-3">
-                        {% for competency in available_competencies %}
+                        {% for group in competency_groups %}
                             <div class="col-12">
                                 <div class="card h-100 border">
                                     <div class="card-body">
-                                        <div class="form-check">
-                                            <input
-                                                class="form-check-input"
-                                                type="checkbox"
-                                                name="competencies"
-                                                value="{{ competency.id }}"
-                                                id="competency-{{ competency.id }}"
-                                                {% if competency.id|stringformat:"s" in selected_competency_ids %}checked{% endif %}
-                                            >
-                                            <label class="form-check-label w-100" for="competency-{{ competency.id }}">
-                                                <span class="d-flex justify-content-between align-items-center gap-2">
-                                                    <strong>{{ competency.name }}</strong>
-                                                    <span class="badge bg-primary-subtle text-primary">{{ competency.get_competency_type_display }}</span>
-                                                </span>
-                                                <span class="d-block text-muted mt-2">{% include 'appraisal/_competency_description.html' with competency=competency %}</span>
-                                            </label>
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                            <strong>{{ group.competency.name }}</strong>
+                                            <span class="badge bg-primary-subtle text-primary">{{ group.competency.get_competency_type_display }}</span>
                                         </div>
+                                        <ul class="list-unstyled mb-0">
+                                            {% for statement in group.statements %}
+                                                <li class="form-check mb-2">
+                                                    <input
+                                                        class="form-check-input"
+                                                        type="checkbox"
+                                                        name="competency_statements"
+                                                        value="{{ statement.value }}"
+                                                        id="competency-statement-{{ statement.value|slugify }}"
+                                                        {% if statement.value in selected_statement_ids %}checked{% endif %}
+                                                    >
+                                                    <label class="form-check-label" for="competency-statement-{{ statement.value|slugify }}">
+                                                        {{ statement.text }}
+                                                    </label>
+                                                </li>
+                                            {% empty %}
+                                                <li class="text-muted">No statements are available for this competency.</li>
+                                            {% endfor %}
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
