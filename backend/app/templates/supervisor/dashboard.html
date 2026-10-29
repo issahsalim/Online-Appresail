@@ -3,16 +3,18 @@
 {% block title %}Supervisor Dashboard | Staff Appraisal System{% endblock %}
 
 {% block content %}
-<div class="supervisor-page">
+<div class="supervisor-page role-dashboard-shell">
     <style>
         body:has(.supervisor-page) { background: #f3f6f8; }
         body:has(.supervisor-page) > .container { max-width: none; padding: 0; width: 100%; }
         .supervisor-page {
             color: #294653;
-            margin: 0 auto;
-            max-width: 1440px;
-            padding: clamp(1rem, 3vw, 2.5rem);
+            margin: 0;
+            max-width: none;
+            min-height: calc(100vh - 64px);
+            padding: 0;
         }
+        .supervisor-dashboard-content { margin: 0 auto; max-width: 1600px; }
         .supervisor-hero {
             align-items: center;
             background: linear-gradient(115deg, #142d3c 0%, #1d4254 100%);
@@ -254,7 +256,8 @@
         }
         .supervisor-action-secondary:hover { background: #edf2f5; color: #173747; }
         @media (max-width: 767.98px) {
-            .supervisor-page { padding: 1rem; }
+            .supervisor-page { display: block; }
+            .supervisor-dashboard-content { padding: 1rem; }
             .supervisor-hero { align-items: start; border-radius: 18px; flex-direction: column; }
             .supervisor-cycle { align-self: flex-start; }
             .supervisor-stats { gap: .55rem; grid-template-columns: 1fr; }
@@ -276,6 +279,56 @@
         }
     </style>
 
+    <aside class="role-dashboard-sidebar" aria-label="Supervisor dashboard navigation" data-default-section="assigned">
+        <div class="role-sidebar-brand">
+            <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+            <span>Staff Appraisal<br><small class="fw-normal opacity-75">SUPERVISOR WORKSPACE</small></span>
+            <button class="role-sidebar-toggle" type="button" aria-controls="supervisor-dashboard-navigation" aria-expanded="false">
+                <span aria-hidden="true">☰</span> Menu
+            </button>
+        </div>
+        <div class="role-sidebar-label">Workspace</div>
+        <nav class="role-sidebar-nav" id="supervisor-dashboard-navigation">
+            <button class="role-sidebar-link active" type="button" data-role-section-target="assigned">
+                <span class="role-sidebar-icon" aria-hidden="true">◉</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">Assigned appraisals</span>
+                    <span class="role-sidebar-link-note">All team appraisal records</span>
+                </span>
+                <span class="role-sidebar-count">{{ assigned_appraisals.count }}</span>
+            </button>
+            <button class="role-sidebar-link" type="button" data-role-section-target="pending">
+                <span class="role-sidebar-icon" aria-hidden="true">◷</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">Pending review</span>
+                    <span class="role-sidebar-link-note">Appraisals needing your review</span>
+                </span>
+                <span class="role-sidebar-count">{{ pending_reviews.count }}</span>
+            </button>
+            {% if request.user.profile.role == 'Supervisor' %}
+                <button class="role-sidebar-link" type="button" data-role-section-target="create">
+                    <span class="role-sidebar-icon" aria-hidden="true">＋</span>
+                    <span class="role-sidebar-link-copy">
+                        <span class="role-sidebar-link-title">Create appraisals</span>
+                        <span class="role-sidebar-link-note">Start an appraisal cycle</span>
+                    </span>
+                </button>
+            {% endif %}
+            {% if has_supervisor %}
+                <button class="role-sidebar-link" type="button" data-role-section-target="own">
+                    <span class="role-sidebar-icon" aria-hidden="true">▤</span>
+                    <span class="role-sidebar-link-copy">
+                        <span class="role-sidebar-link-title">My own appraisal</span>
+                        <span class="role-sidebar-link-note">Your employee appraisal</span>
+                    </span>
+                </button>
+            {% endif %}
+        </nav>
+        <div class="role-sidebar-label">Signed in</div>
+        <div class="small px-2 text-white-50">{{ request.user.username }}</div>
+    </aside>
+
+    <main class="role-dashboard-content supervisor-dashboard-content">
     <header class="supervisor-hero">
         <div class="supervisor-hero-content">
             <div class="supervisor-eyebrow">Supervisor workspace</div>
@@ -296,7 +349,7 @@
         <div class="supervisor-stat">
             <span class="supervisor-stat-icon" aria-hidden="true">▤</span>
             <span>
-                <span class="supervisor-stat-label">Cycle appraisals</span>
+                <span class="supervisor-stat-label">Assigned appraisals</span>
                 <span class="supervisor-stat-value">{{ assigned_appraisals.count }}</span>
             </span>
         </div>
@@ -309,41 +362,9 @@
         </div>
     </section>
 
-    <section class="supervisor-workspace" aria-label="Supervisor workspace sections">
-        <ul class="nav supervisor-tabs" id="supervisor-workspace-tabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button
-                    class="nav-link active"
-                    id="team-tab"
-                    data-bs-toggle="tab"
-                    data-bs-target="#team"
-                    type="button"
-                    role="tab"
-                    aria-controls="team"
-                    aria-selected="true"
-                >
-                    My Team <span class="supervisor-tab-count">{{ pending_reviews.count }}</span>
-                </button>
-            </li>
-            {% if has_supervisor %}
-                <li class="nav-item" role="presentation">
-                    <button
-                        class="nav-link"
-                        id="my-appraisal-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#my-appraisal"
-                        type="button"
-                        role="tab"
-                        aria-controls="my-appraisal"
-                        aria-selected="false"
-                    >My Own Appraisal</button>
-                </li>
-            {% endif %}
-        </ul>
-
-        <div class="tab-content supervisor-tab-content" id="supervisor-workspace-content">
-            <div class="tab-pane fade show active" id="team" role="tabpanel" aria-labelledby="team-tab" tabindex="0">
-                {% if request.user.profile.role == 'Supervisor' %}
+    {% if request.user.profile.role == 'Supervisor' %}
+    <section class="supervisor-workspace role-dashboard-section" data-role-section="create" aria-label="Create appraisals">
+        <div class="supervisor-tab-content">
                     <section class="supervisor-create-panel" aria-labelledby="create-appraisal-heading">
                         <h2 class="supervisor-create-heading" id="create-appraisal-heading">Create employee appraisals</h2>
                         <p class="supervisor-create-copy">Start appraisals for one assigned employee or for your whole team. Existing appraisals will not be overwritten.</p>
@@ -366,14 +387,32 @@
                             </div>
                         </form>
                     </section>
-                {% endif %}
+        </div>
+    </section>
+    {% endif %}
 
+    <section class="supervisor-workspace role-dashboard-section" data-role-section="assigned" aria-label="Assigned appraisals" {% if request.user.profile.role == 'Supervisor' %}hidden{% endif %}>
+        <div class="supervisor-tab-content">
                 <section aria-labelledby="assigned-appraisals-heading">
                     <div class="supervisor-section-heading">
                         <div>
                             <h2 id="assigned-appraisals-heading">My Assigned Appraisals</h2>
-                            <p>Current-cycle appraisal records for your team.</p>
+                            <p>Appraisal records for your team across cycles.</p>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="supervisor-assigned-search" class="form-label fw-semibold">Find an assigned appraisal</label>
+                        <input
+                            id="supervisor-assigned-search"
+                            type="search"
+                            class="form-control"
+                            placeholder="Search by employee, department, cycle, or status"
+                            autocomplete="off"
+                            data-dashboard-search
+                            data-search-target="supervisor-assigned-appraisals"
+                            data-search-status="supervisor-assigned-search-status"
+                        >
+                        <div id="supervisor-assigned-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
                     </div>
                     <div class="supervisor-table-wrap mb-4">
                         <table class="table supervisor-table">
@@ -383,11 +422,12 @@
                                     <th>Department</th>
                                     <th>Cycle</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="supervisor-assigned-appraisals">
                                 {% for appraisal in assigned_appraisals %}
-                                    <tr>
+                                    <tr data-search-item>
                                         <td>
                                             <span class="supervisor-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span>
                                             {% if appraisal.employee.user.get_full_name %}
@@ -397,12 +437,15 @@
                                         <td>{{ appraisal.employee.department.name|default:"—" }}</td>
                                         <td>{{ appraisal.cycle.year }}</td>
                                         <td><span class="supervisor-status">{{ appraisal.get_status_display }}</span></td>
+                                        <td>
+                                            <a href="{% url 'supervisor_view_appraisal' appraisal.id %}" class="supervisor-action-secondary">View appraisal</a>
+                                        </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="4" class="supervisor-empty">
-                                            <strong>No appraisals started yet</strong>
-                                            Appraisals assigned to you for this cycle will appear here.
+                                        <td colspan="5" class="supervisor-empty" data-search-empty-state>
+                                            <strong>No appraisal records yet</strong>
+                                            Appraisals assigned to you will appear here.
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -410,13 +453,31 @@
                         </table>
                     </div>
                 </section>
+        </div>
+    </section>
 
+    <section class="supervisor-workspace role-dashboard-section" data-role-section="pending" aria-label="Pending reviews" hidden>
+        <div class="supervisor-tab-content">
                 <section aria-labelledby="pending-reviews-heading">
                     <div class="supervisor-section-heading">
                         <div>
                             <h2 id="pending-reviews-heading">Appraisals Pending My Review</h2>
                             <p>Open an appraisal to review the employee’s submission.</p>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="supervisor-pending-search" class="form-label fw-semibold">Find an appraisal awaiting review</label>
+                        <input
+                            id="supervisor-pending-search"
+                            type="search"
+                            class="form-control"
+                            placeholder="Search by employee, department, or cycle"
+                            autocomplete="off"
+                            data-dashboard-search
+                            data-search-target="supervisor-pending-appraisals"
+                            data-search-status="supervisor-pending-search-status"
+                        >
+                        <div id="supervisor-pending-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
                     </div>
                     <div class="supervisor-table-wrap">
                         <table class="table supervisor-table">
@@ -428,9 +489,9 @@
                                     <th>Action</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="supervisor-pending-appraisals">
                                 {% for appraisal in pending_reviews %}
-                                    <tr>
+                                    <tr data-search-item>
                                         <td>
                                             <span class="supervisor-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span>
                                             {% if appraisal.employee.user.get_full_name %}
@@ -440,12 +501,15 @@
                                         <td>{{ appraisal.employee.department.name|default:"—" }}</td>
                                         <td>{{ appraisal.cycle.year }}</td>
                                         <td>
-                                            <a href="{% url 'supervisor_review' appraisal.id %}" class="supervisor-action">Review appraisal</a>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <a href="{% url 'supervisor_review' appraisal.id %}" class="supervisor-action">Review appraisal</a>
+                                                <a href="{% url 'supervisor_view_appraisal' appraisal.id %}" class="supervisor-action-secondary">View</a>
+                                            </div>
                                         </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="4" class="supervisor-empty">
+                                        <td colspan="4" class="supervisor-empty" data-search-empty-state>
                                             <strong>You’re all caught up</strong>
                                             No team appraisals are waiting for your review.
                                         </td>
@@ -455,37 +519,40 @@
                         </table>
                     </div>
                 </section>
-            </div>
-
-            {% if has_supervisor %}
-                <div class="tab-pane fade" id="my-appraisal" role="tabpanel" aria-labelledby="my-appraisal-tab" tabindex="0">
-                    <section class="supervisor-own-card">
-                        <div class="supervisor-own-top">
-                            <div>
-                                <h2>My Own Appraisal</h2>
-                                <p>As an employee, you can also set your goals and submit them to your assigned supervisor.</p>
-                            </div>
-                            <span class="supervisor-status">{{ my_appraisal.get_status_display }}</span>
-                        </div>
-                        <div class="supervisor-own-actions">
-                            <a href="{% url 'fill_targets' %}" class="supervisor-action-secondary">
-                                {% if my_appraisal.status == 'draft' %}Edit my goals{% else %}View my goals{% endif %}
-                            </a>
-                            {% if my_appraisal.status == 'draft' %}
-                                <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
-                                    {% csrf_token %}
-                                    <button
-                                        type="submit"
-                                        class="supervisor-action"
-                                        onclick="return confirm('Submit to your supervisor? You cannot edit after this.')"
-                                    >Submit to my supervisor</button>
-                                </form>
-                            {% endif %}
-                        </div>
-                    </section>
-                </div>
-            {% endif %}
         </div>
     </section>
+    {% if has_supervisor %}
+                <section class="supervisor-workspace role-dashboard-section" data-role-section="own" aria-label="My own appraisal" hidden>
+                    <div class="supervisor-tab-content">
+                        <section class="supervisor-own-card">
+                            <div class="supervisor-own-top">
+                                <div>
+                                    <h2>My Own Appraisal</h2>
+                                    <p>As an employee, you can also set your goals and submit them to your assigned supervisor.</p>
+                                </div>
+                                <span class="supervisor-status">{{ my_appraisal.get_status_display }}</span>
+                            </div>
+                            <div class="supervisor-own-actions">
+                                <a href="{% url 'fill_targets' %}" class="supervisor-action-secondary">
+                                    {% if my_appraisal.status == 'draft' %}Edit my goals{% else %}View my goals{% endif %}
+                                </a>
+                                {% if my_appraisal.status == 'draft' %}
+                                    <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
+                                        {% csrf_token %}
+                                        <button
+                                            type="submit"
+                                            class="supervisor-action"
+                                            data-confirm="Submit your appraisal to your supervisor? You will not be able to edit it afterward."
+                                            data-confirm-title="Submit appraisal?"
+                                            data-confirm-label="Submit appraisal"
+                                        >Submit to my supervisor</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </section>
+                    </div>
+                </section>
+    {% endif %}
+    </main>
 </div>
 {% endblock %}

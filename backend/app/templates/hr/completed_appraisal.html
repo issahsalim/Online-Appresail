@@ -1,9 +1,18 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5 mb-5">
+<div class="container mt-4 mb-5 appraisal-form-page">
+    <style>
+        .appraisal-form-page { max-width: 1100px; }
+        .appraisal-fields { display: grid; gap: .8rem 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .appraisal-field { border-bottom: 1px solid #e8edef; min-width: 0; padding: .35rem 0; }
+        .appraisal-paper .table { margin-bottom: 0; }
+        .appraisal-paper .table thead th { background: #faf7f5; text-align: center; vertical-align: middle; }
+        @media (max-width: 575.98px) { .appraisal-fields { grid-template-columns: 1fr; } }
+    </style>
     <h2>Completed Appraisal</h2>
     <p class="text-muted">This appraisal is completed and locked for HR.</p>
     {% include 'appraisal/_employee_details.html' %}
+    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
 
     <div class="card mb-4">
         <div class="card-header bg-dark text-white">Appraisal Details</div>
@@ -19,82 +28,18 @@
     </div>
 
     {% include 'appraisal/_training.html' %}
-
-    <div class="card mb-4">
-        <div class="card-header">Targets and Supervisor Assessment</div>
-        <div class="card-body table-responsive">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Target</th>
-                        <th>Description</th>
-                        <th>Mid-year progress</th>
-                        <th>Mid-year remark</th>
-                        <th>End-year assessment</th>
-                        <th>Score</th>
-                        <th>End-year comment</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for target in targets %}
-                        <tr>
-                            <td>{{ target.key_result_area }}</td>
-                            <td>{{ target.target_description }}</td>
-                            <td>{{ target.get_mid_year_progress_display|default:"—" }}</td>
-                            <td>{{ target.get_mid_year_remark_display|default:"—" }}</td>
-                            <td>{{ target.get_end_year_assessment_display|default:"—" }}</td>
-                            <td>{{ target.end_year_score|default:"—" }}</td>
-                            <td>{{ target.get_end_year_comment_display|default:"—" }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="7" class="text-center">No targets recorded.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    {% include 'appraisal/_targets_readonly.html' %}
+    {% include 'appraisal/_competencies_readonly.html' %}
+    {% include 'appraisal/_annual_appraisal_results.html' %}
+    {% include 'appraisal/_appraisal_comment_sections.html' %}
+    {% include 'appraisal/_hod_comment_section.html' %}
+    <section class="appraisal-paper">
+        <h2 class="appraisal-section-title">Final HR Approval</h2>
+        <div class="appraisal-section-body">
+            <div class="appraisal-comment-box">{{ appraisal.hr_comments|default:"No HR comments provided."|linebreaksbr }}</div>
+            <p class="appraisal-signature-row"><strong>HR approval date:</strong> {{ appraisal.hr_approved_at|date:"d/m/Y"|default:"—" }}</p>
         </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header">Competency Assessments</div>
-        <div class="card-body table-responsive">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Competency</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                        <th>Mid-year progress</th>
-                        <th>Mid-year remark</th>
-                        <th>End-year score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for score in competencies %}
-                        <tr>
-                            <td>{{ score.competency.name }}</td>
-                            <td>{{ score.competency.get_competency_type_display }}</td>
-                            <td>{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td>
-                            <td>{{ score.get_mid_year_progress_display|default:"—" }}</td>
-                            <td>{{ score.get_mid_year_remark_display|default:"—" }}</td>
-                            <td>{{ score.end_year_score|default:"—" }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="6" class="text-center">No competency assessments recorded.</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card mb-4">
-        <div class="card-header">Review Comments</div>
-        <div class="card-body">
-            <p><strong>Employee:</strong> {{ appraisal.employee_comments|default:"—" }}</p>
-            <p><strong>Supervisor:</strong> {{ appraisal.supervisor_comments|default:"—" }}</p>
-            <p><strong>HOD:</strong> {{ appraisal.hod_comments|default:"—" }}</p>
-            <p><strong>HR:</strong> {{ appraisal.hr_comments|default:"—" }}</p>
-        </div>
-    </div>
+    </section>
 
     {% if return_history %}
         <div class="card mb-4">

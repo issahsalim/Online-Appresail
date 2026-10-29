@@ -408,6 +408,13 @@
                     <span class="hr-sidebar-link-note">Manage reporting lines</span>
                 </span>
             </button>
+            <a class="hr-sidebar-link" href="{% url 'new_app_cycle' %}">
+                <span class="hr-sidebar-icon" aria-hidden="true">＋</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Appraisal cycles</span>
+                    <span class="hr-sidebar-link-note">Create and manage cycles</span>
+                </span>
+            </a>
         </nav>
         <div class="hr-sidebar-label">Signed in</div>
         <div class="small px-2 text-white-50">{{ request.user.username }}</div>
@@ -538,6 +545,20 @@
         <p>Review appraisals submitted by department heads.</p>
     </div>
 
+    <div class="mb-3">
+        <label class="form-label fw-semibold" for="hr-pending-search">Find a pending appraisal</label>
+        <input
+            id="hr-pending-search"
+            type="search"
+            class="form-control"
+            placeholder="Search by employee, staff ID, department, reviewer, cycle, or status"
+            autocomplete="off"
+            data-dashboard-search
+            data-search-target="hr-pending-appraisals"
+            data-search-status="hr-pending-search-status"
+        >
+        <p id="hr-pending-search-status" class="small text-muted mb-0 mt-2" role="status" aria-live="polite"></p>
+    </div>
     <div class="hr-table-card table-responsive">
     <table class="table table-hover bg-white shadow-sm">
         <thead>
@@ -546,23 +567,27 @@
                 <th>Department</th>
                 <th>Supervisor</th>
                 <th>HOD</th>
+                <th>Cycle</th>
+                <th>Status</th>
                 <th>Action</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="hr-pending-appraisals">
             {% for appraisal in pending_reviews %}
-            <tr>
+            <tr data-search-item>
                 <td>{{ appraisal.employee.user.username }}</td>
-                <td>{{ appraisal.employee.department.name }}</td>
-                <td>{{ appraisal.supervisor.user.username }}</td>
-                <td>{{ appraisal.hod.user.username }}</td>
+                <td>{{ appraisal.employee_department.name|default:appraisal.employee_department_name|default:appraisal.employee.department.name|default:"—" }}</td>
+                <td>{{ appraisal.supervisor.user.username|default:"—" }}</td>
+                <td>{{ appraisal.hod.user.username|default:"—" }}</td>
+                <td>{{ appraisal.cycle.year }}</td>
+                <td>{{ appraisal.get_status_display }}</td>
                 <td>
                     <a href="{% url 'hr_approve' appraisal.id %}" class="btn btn-sm hr-action-primary">Review &amp; Approve</a>
                 </td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="5" class="text-center py-5">
+                <td colspan="7" class="text-center py-5" data-search-empty-state>
                     <strong class="d-block text-body">You’re all caught up</strong>
                     <span class="small text-muted">No appraisals are waiting for HR approval.</span>
                 </td>
@@ -677,6 +702,7 @@
                     {% endif %}
                     <button type="submit" class="btn hr-action-primary">Save Supervisor Assignment</button>
                 </form>
+
             </div>
         </div>
 
@@ -892,7 +918,7 @@
                 if (preserveSupervisor) supervisorSelect.value = preserveSupervisor;
                 else if (data.current_supervisor_id) supervisorSelect.value = data.current_supervisor_id;
             } catch (error) {
-                window.alert(error.message);
+                window.showAppModal(error.message, 'Could not load assignments');
             } finally {
                 employeeSelect.disabled = false;
                 supervisorSelect.disabled = false;

@@ -151,7 +151,7 @@
                     supervisorSelect.value = data.current_supervisor_id;
                 }
             } catch (error) {
-                window.alert(error.message);
+                window.showAppModal(error.message, 'Could not load assignments');
             } finally {
                 employeeSelect.disabled = false;
                 supervisorSelect.disabled = false;

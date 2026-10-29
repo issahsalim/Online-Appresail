@@ -1,71 +1,251 @@
 {% extends 'base.html' %}
+
+{% block title %}HOD Dashboard | Staff Appraisal System{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2>HOD Dashboard</h2>
-    <p class="text-muted">Welcome, {{ request.user.username }}. Review your department's appraisals below.</p>
+<div class="hod-page role-dashboard-shell">
+    <style>
+        body:has(.hod-page) { background: #f3f6f8; }
+        body:has(.hod-page) > .container { max-width: none; padding: 0; width: 100%; }
+        .hod-page { color: #294653; margin: 0; max-width: none; min-height: calc(100vh - 64px); padding: 0; }
+        .hod-dashboard-content { margin: 0 auto; max-width: 1600px; }
+        .hod-hero {
+            align-items: center;
+            background: linear-gradient(115deg, #142d3c, #1d4254);
+            border-radius: 22px;
+            box-shadow: 0 18px 42px rgba(20, 45, 60, .14);
+            color: #fff;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: space-between;
+            margin-bottom: 1.2rem;
+            padding: clamp(1.4rem, 3vw, 2.2rem);
+        }
+        .hod-eyebrow { color: #c2d0d7; font-size: .73rem; font-weight: 750; letter-spacing: .13em; margin-bottom: .55rem; text-transform: uppercase; }
+        .hod-hero h1 { font-size: clamp(1.75rem, 4vw, 2.4rem); font-weight: 780; letter-spacing: -.045em; margin: 0 0 .45rem; }
+        .hod-hero p { color: #d1dce1; margin: 0; }
+        .hod-cycle { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.17); border-radius: 12px; color: #fff; font-size: .8rem; font-weight: 700; padding: .75rem .95rem; }
+        .hod-stats { display: grid; gap: .9rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 1.35rem; }
+        .hod-stat { background: #fff; border: 1px solid #e1e8ec; border-radius: 16px; box-shadow: 0 8px 22px rgba(20, 45, 60, .035); padding: 1rem 1.1rem; }
+        .hod-stat-label { color: #72828b; display: block; font-size: .76rem; font-weight: 650; }
+        .hod-stat-value { color: #173747; display: block; font-size: 1.35rem; font-weight: 780; line-height: 1.2; }
+        .hod-workspace { background: #fff; border: 1px solid #e0e8ec; border-radius: 18px; box-shadow: 0 10px 28px rgba(20, 45, 60, .045); overflow: hidden; }
+        .hod-tabs { background: #f7f9fa; border-bottom: 1px solid #e3eaed; display: flex; gap: .45rem; overflow-x: auto; padding: .8rem 1rem 0; }
+        .hod-tabs .nav-link { border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; color: #667c86; font-size: .86rem; font-weight: 700; min-height: 46px; padding: .65rem .95rem; white-space: nowrap; }
+        .hod-tabs .nav-link:hover { background: #eef2f4; color: #173747; }
+        .hod-tabs .nav-link.active { background: #fff; border-color: #e3eaed; color: #173747; }
+        .hod-tab-count { background: #edf2f5; border-radius: 999px; color: #23495b; display: inline-flex; font-size: .7rem; font-weight: 750; justify-content: center; margin-left: .35rem; min-width: 22px; padding: .13rem .38rem; }
+        .hod-tab-content { padding: clamp(1rem, 2.5vw, 1.65rem); }
+        .hod-section-heading { margin-bottom: 1rem; }
+        .hod-section-heading h2 { color: #173747; font-size: 1.08rem; font-weight: 760; margin: 0 0 .28rem; }
+        .hod-section-heading p { color: #72828b; font-size: .84rem; margin: 0; }
+        .hod-table-wrap { border: 1px solid #e3eaed; border-radius: 12px; overflow-x: auto; }
+        .hod-table { margin-bottom: 0; min-width: 680px; }
+        .hod-table th { background: #f7f9fa; border-bottom: 1px solid #e5ecef; color: #496370; font-size: .74rem; font-weight: 750; letter-spacing: .04em; padding: .8rem .9rem; text-transform: uppercase; }
+        .hod-table td { border-bottom: 1px solid #edf2f5; color: #2c4a57; font-size: .84rem; padding: .85rem .9rem; vertical-align: middle; }
+        .hod-table tr:last-child td { border-bottom: 0; }
+        .hod-employee { color: #173747; display: block; font-weight: 700; }
+        .hod-employee-id { color: #72828b; display: block; font-size: .75rem; }
+        .hod-status { background: #edf2f5; border: 1px solid #dbe4e8; border-radius: 999px; color: #23495b; display: inline-flex; font-size: .73rem; font-weight: 700; padding: .32rem .62rem; }
+        .hod-action { align-items: center; background: #173f50; border: 1px solid #173f50; border-radius: 8px; color: #fff; display: inline-flex; font-size: .79rem; font-weight: 700; justify-content: center; padding: .48rem .7rem; text-decoration: none; white-space: nowrap; }
+        .hod-action:hover { background: #20596a; color: #fff; }
+        .hod-action-secondary { background: #edf2f5; border-color: #d7e0e5; color: #23495b; }
+        .hod-action-secondary:hover { background: #e1e9ed; color: #173747; }
+        .hod-empty { color: #72828b !important; padding: 2rem 1rem !important; text-align: center; }
+        .hod-empty strong { color: #365461; display: block; margin-bottom: .25rem; }
+        .hod-own-card { background: #f7f9fa; border: 1px solid #e3eaed; border-radius: 14px; padding: 1.2rem; }
+        .hod-own-card h2 { color: #173747; font-size: 1.05rem; font-weight: 750; margin-bottom: .35rem; }
+        .hod-own-card p { color: #72828b; font-size: .84rem; margin-bottom: 1rem; }
+        .hod-own-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+        @media (max-width: 767.98px) {
+            .hod-page { display: block; }
+            .hod-dashboard-content { padding: 1rem; }
+            .hod-hero { align-items: flex-start; flex-direction: column; }
+            .hod-stats { grid-template-columns: 1fr; }
+            .hod-own-actions > * { width: 100%; }
+        }
+    </style>
 
-    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="dept-tab" data-bs-toggle="tab" data-bs-target="#dept" type="button" role="tab">
-                <strong>🏢 Department Queue ({{ pending_reviews.count }})</strong>
+    <aside class="role-dashboard-sidebar" aria-label="HOD dashboard navigation">
+        <div class="role-sidebar-brand">
+            <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+            <span>Staff Appraisal<br><small class="fw-normal opacity-75">HOD WORKSPACE</small></span>
+            <button class="role-sidebar-toggle" type="button" aria-controls="hod-dashboard-navigation" aria-expanded="false">
+                <span aria-hidden="true">☰</span> Menu
             </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="my-appraisal-tab" data-bs-toggle="tab" data-bs-target="#my-appraisal" type="button" role="tab">
-                <strong>📄 My Own Appraisal</strong>
+        </div>
+        <div class="role-sidebar-label">Workspace</div>
+        <nav class="role-sidebar-nav" id="hod-dashboard-navigation">
+            <button class="role-sidebar-link active" type="button" data-role-section-target="pending">
+                <span class="role-sidebar-icon" aria-hidden="true">◷</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">Pending review</span>
+                    <span class="role-sidebar-link-note">Department appraisals</span>
+                </span>
+                <span class="role-sidebar-count">{{ pending_reviews.count }}</span>
             </button>
-        </li>
-    </ul>
+            <button class="role-sidebar-link" type="button" data-role-section-target="history">
+                <span class="role-sidebar-icon" aria-hidden="true">▤</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">Appraisal history</span>
+                    <span class="role-sidebar-link-note">Submitted and completed</span>
+                </span>
+                <span class="role-sidebar-count">{{ historical_appraisals.count }}</span>
+            </button>
+            <button class="role-sidebar-link" type="button" data-role-section-target="own">
+                <span class="role-sidebar-icon" aria-hidden="true">♙</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">My own appraisal</span>
+                    <span class="role-sidebar-link-note">Your employee appraisal</span>
+                </span>
+            </button>
+        </nav>
+        <div class="role-sidebar-label">Signed in</div>
+        <div class="small px-2 text-white-50">{{ request.user.username }}</div>
+    </aside>
 
-    <div class="tab-content" id="myTabContent">
-        <!-- TAB 1: DEPARTMENT QUEUE -->
-        <div class="tab-pane fade show active" id="dept" role="tabpanel">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">Appraisals Pending My Review</h5>
-                    <table class="table table-hover mt-3">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>Employee</th>
-                                <th>Supervisor</th>
-                                <th>Department</th>
-                                <th>Action</th>
-                            </tr>
+    <main class="role-dashboard-content hod-dashboard-content">
+    <header class="hod-hero">
+        <div>
+            <div class="hod-eyebrow">Department head workspace</div>
+            <h1>Welcome, {{ request.user.first_name|default:request.user.username }}</h1>
+            <p>Review department appraisals and follow the records you oversee.</p>
+        </div>
+        {% if cycle %}<div class="hod-cycle">Active cycle · {{ cycle.year }}</div>{% endif %}
+    </header>
+
+    <section class="hod-stats" aria-label="Department appraisal summary">
+        <div class="hod-stat">
+            <span class="hod-stat-label">Awaiting your review</span>
+            <span class="hod-stat-value">{{ pending_reviews.count }}</span>
+        </div>
+        <div class="hod-stat">
+            <span class="hod-stat-label">Historical appraisals</span>
+            <span class="hod-stat-value">{{ historical_appraisals.count }}</span>
+        </div>
+        <div class="hod-stat">
+            <span class="hod-stat-label">Active cycle</span>
+            <span class="hod-stat-value">{% if cycle %}{{ cycle.year }}{% else %}—{% endif %}</span>
+        </div>
+    </section>
+
+    <section class="hod-workspace role-dashboard-section" data-role-section="pending" aria-label="Pending HOD reviews">
+            <div class="p-3 p-lg-4">
+                <div class="hod-section-heading">
+                    <h2>Appraisals pending my review</h2>
+                    <p>Review or open a read-only copy of an appraisal assigned to you.</p>
+                </div>
+                <div class="mb-3">
+                    <label for="hod-pending-search" class="form-label fw-semibold">Find an appraisal awaiting review</label>
+                    <input
+                        id="hod-pending-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search by employee, supervisor, department, cycle, or status"
+                        autocomplete="off"
+                        data-dashboard-search
+                        data-search-target="hod-pending-appraisals"
+                        data-search-status="hod-pending-search-status"
+                    >
+                    <div id="hod-pending-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
+                </div>
+                <div class="hod-table-wrap">
+                    <table class="table hod-table">
+                        <thead>
+                            <tr><th>Employee</th><th>Supervisor</th><th>Department</th><th>Cycle</th><th>Status</th><th>Actions</th></tr>
                         </thead>
-                        <tbody>
+                        <tbody id="hod-pending-appraisals">
                             {% for appraisal in pending_reviews %}
-                            <tr>
-                                <td>{{ appraisal.employee.user.username }}</td>
-                                <td>{{ appraisal.supervisor.user.username }}</td>
-                                <td>{{ appraisal.employee.department.name }}</td>
-                                <td>
-                                    <a href="{% url 'hod_review' appraisal.id %}" class="btn btn-sm btn-primary">Review Appraisal</a>
-                                </td>
-                            </tr>
+                                <tr data-search-item>
+                                    <td><span class="hod-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span><span class="hod-employee-id">{{ appraisal.employee.user.username }}</span></td>
+                                    <td>{{ appraisal.supervisor.user.get_full_name|default:appraisal.supervisor.user.username|default:"—" }}</td>
+                                    <td>{{ appraisal.employee_department.name|default:appraisal.employee_department_name|default:"—" }}</td>
+                                    <td>{{ appraisal.cycle.year }}</td>
+                                    <td><span class="hod-status">{{ appraisal.get_status_display }}</span></td>
+                                    <td>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <a href="{% url 'hod_review' appraisal.id %}" class="hod-action">Review</a>
+                                            <a href="{% url 'hod_view_appraisal' appraisal.id %}" class="hod-action hod-action-secondary">View</a>
+                                        </div>
+                                    </td>
+                                </tr>
                             {% empty %}
-                            <tr>
-                                <td colspan="4" class="text-center">No pending department appraisals right now.</td>
-                            </tr>
+                                <tr><td colspan="6" class="hod-empty" data-search-empty-state><strong>You’re all caught up</strong>No appraisals are waiting for your review.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
+    </section>
 
-        <!-- TAB 2: MY OWN APPRAISAL -->
-        <div class="tab-pane fade" id="my-appraisal" role="tabpanel">
-            <div class="card shadow-sm">
-                <div class="card-body">
-                    <h5 class="card-title">My Appraisal Status</h5>
-                    <hr>
-                    <h6>Status: <span class="badge bg-info">{{ my_appraisal.get_status_display }}</span></h6>
-                    <div class="mt-4">
-                        <a href="{% url 'fill_targets' %}" class="btn btn-primary">View My Goals</a>
-                    </div>
+    <section class="hod-workspace role-dashboard-section" data-role-section="history" aria-label="Appraisal history" hidden>
+            <div class="p-3 p-lg-4">
+                <div class="hod-section-heading">
+                    <h2>Historical appraisals</h2>
+                    <p>Open appraisals you have reviewed and submitted for final approval or that are complete.</p>
+                </div>
+                <div class="mb-3">
+                    <label for="hod-history-search" class="form-label fw-semibold">Search appraisal history</label>
+                    <input
+                        id="hod-history-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search by employee, supervisor, department, cycle, or status"
+                        autocomplete="off"
+                        data-dashboard-search
+                        data-search-target="hod-appraisal-history"
+                        data-search-status="hod-history-search-status"
+                    >
+                    <div id="hod-history-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
+                </div>
+                <div class="hod-table-wrap">
+                    <table class="table hod-table">
+                        <thead>
+                            <tr><th>Employee</th><th>Supervisor</th><th>Department</th><th>Cycle</th><th>Status</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="hod-appraisal-history">
+                            {% for appraisal in historical_appraisals %}
+                                <tr data-search-item>
+                                    <td><span class="hod-employee">{{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span><span class="hod-employee-id">{{ appraisal.employee.user.username }}</span></td>
+                                    <td>{{ appraisal.supervisor.user.get_full_name|default:appraisal.supervisor.user.username|default:"—" }}</td>
+                                    <td>{{ appraisal.employee_department.name|default:appraisal.employee_department_name|default:"—" }}</td>
+                                    <td>{{ appraisal.cycle.year }}</td>
+                                    <td><span class="hod-status">{{ appraisal.get_status_display }}</span></td>
+                                    <td><a href="{% url 'hod_view_appraisal' appraisal.id %}" class="hod-action hod-action-secondary">View appraisal</a></td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="6" class="hod-empty" data-search-empty-state><strong>No history yet</strong>Appraisals you have sent to HR will appear here.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-        </div>
-    </div>
+    </section>
+
+    <section class="hod-workspace role-dashboard-section" data-role-section="own" aria-label="My own appraisal" hidden>
+            <div class="p-3 p-lg-4">
+                <section class="hod-own-card">
+                    <h2>My own appraisal</h2>
+                    {% if my_appraisal %}
+                        <p>Cycle {{ my_appraisal.cycle.year }} · <span class="hod-status">{{ my_appraisal.get_status_display }}</span></p>
+                        <div class="hod-own-actions">
+                            <a href="{% url 'fill_targets' %}" class="hod-action hod-action-secondary">
+                                {% if my_appraisal.status == 'draft' or my_appraisal.status == 'returned_employee' %}Edit my goals{% else %}View my appraisal{% endif %}
+                            </a>
+                            {% if my_appraisal.status == 'draft' %}
+                                <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="hod-action">Submit to my supervisor</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <p>There is no active appraisal cycle. Contact HR for information about the next cycle.</p>
+                    {% endif %}
+                </section>
+            </div>
+    </section>
+    </main>
 </div>
 {% endblock %}

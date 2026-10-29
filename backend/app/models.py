@@ -117,7 +117,7 @@ class AppraisalCycle(models.Model):
     is_active = models.BooleanField(default=True)
     report_period_from = models.DateField(null=True, blank=True)
     report_period_to = models.DateField(null=True, blank=True)
-
+        
     def __str__(self):
         return f"Cycle {self.year}"
 
@@ -130,6 +130,9 @@ class AppraisalCycle(models.Model):
             raise ValidationError({
                 'report_period_to': 'The report period end date must be on or after its start date.',
             })
+
+    class Meta:
+        ordering = ['-year']
 
 
 class Competency(models.Model):
@@ -159,6 +162,13 @@ class Competency(models.Model):
 # ==========================================
 
 class Appraisal(models.Model):
+    ASSESSMENT_DECISION_CHOICES = [
+        ('promote_now', 'Outstanding - should be promoted as soon as possible'),
+        ('suitable', 'Suitable for promotion'),
+        ('ready_2_3_years', 'Likely to be ready for promotion in 2 to 3 years'),
+        ('not_ready', 'Not ready for promotion for at least 3 years / unlikely to be promoted further'),
+    ]
+
     STATUS_CHOICES = [
         ('draft', 'Draft (Employee filling)'),
         ('pending_manager', 'Pending Supervisor Review'),
@@ -209,6 +219,12 @@ class Appraisal(models.Model):
     # Comments for each stage (Rules enforced in views/templates)
     employee_comments = models.TextField(blank=True, null=True)
     supervisor_comments = models.TextField(blank=True, null=True)
+    career_development_plan = models.TextField(blank=True)
+    assessment_decision = models.CharField(
+        max_length=20,
+        choices=ASSESSMENT_DECISION_CHOICES,
+        blank=True,
+    )
     hod_comments = models.TextField(blank=True, null=True)
     hr_comments = models.TextField(blank=True, null=True)
 
@@ -241,14 +257,14 @@ class Appraisal(models.Model):
         target_scores = [target.end_year_score for target in target_rows]
         targets_complete = bool(target_rows) and all(
             score is not None for score in target_scores
-        )
+        ) 
         target_total = (
             sum(Decimal(score) for score in target_scores)
             if targets_complete else None
         )
         target_average = (
             target_total / len(target_rows) if targets_complete else None
-        )
+        ) 
         target_component = (
             target_average * Decimal('0.6')
             if target_average is not None else None
@@ -551,3 +567,8 @@ def manage_user_groups(sender, instance, **kwargs):
     instance.user.groups.clear()
     group = Group.objects.get(name=instance.role)
     instance.user.groups.add(group)
+
+
+class StaffID(models.Model): 
+    Staff_ID = models.CharField(max_length=20, unique=True)  
+    

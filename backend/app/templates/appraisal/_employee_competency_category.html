@@ -1,0 +1,31 @@
+<section class="appraisal-competency-category" aria-label="{{ title }}">
+    <h3 class="appraisal-competency-category-heading">{{ title }}</h3>
+    {% if category_groups %}
+        <div class="appraisal-competency-grid">
+            {% for group in category_groups %}
+                <article class="appraisal-competency-card">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <h3>{{ group.competency.name }}</h3>
+                        <span class="badge text-bg-light">{{ group.competency.get_competency_type_display }}</span>
+                    </div>
+                    {% for statement in group.statements %}
+                        <div class="appraisal-competency-statement">
+                            <input
+                                type="checkbox"
+                                name="competency_statements"
+                                value="{{ statement.value }}"
+                                id="competency-statement-{{ statement.value|slugify }}"
+                                {% if statement.value in selected_statement_ids %}checked{% endif %}
+                            >
+                            <label for="competency-statement-{{ statement.value|slugify }}">{{ statement.text }}</label>
+                        </div>
+                    {% empty %}
+                        <p class="text-muted mb-0 mt-2">No statements are available for this competency.</p>
+                    {% endfor %}
+                </article>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted mb-0">No {{ title|lower }} are available yet. Please contact HR.</p>
+    {% endif %}
+</section>

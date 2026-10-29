@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.test import TestCase
 from django.contrib.auth.models import User
 from django.contrib import admin
@@ -83,9 +85,13 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         self.assertContains(response, 'End-year score:</strong> 4')
         self.assertContains(response, 'End-year score:</strong> 5')
         self.assertContains(response, 'Overall Score Calculation')
-        self.assertContains(response, 'M — A × 0.6:</strong> 2.40')
-        self.assertContains(response, 'N — Average of core competency group averages:</strong> 1.50')
-        self.assertContains(response, 'T — M + N + O:</strong> 3.90')
+
+        self.assertContains(response, 'M — A × 0.6:')
+        self.assertContains(response, 'N — Average of core competency group averages:')
+        self.assertContains(response, 'T — M + N + O:')
+        self.assertContains(response, '2.40')
+        self.assertContains(response, '1.50')
+        self.assertContains(response, '3.90')
         self.assertContains(response, '78.00%')
 
         response = self.client.post(reverse('fill_targets'), {
@@ -95,9 +101,73 @@ class EmployeeAppraisalVisibilityTests(TestCase):
             'targets-MAX_NUM_FORMS': '1000',
         })
 
-        self.assertRedirects(response, reverse('fill_targets'))
+        self.assertRedirects(
+            response,
+            reverse('fill_targets_year', args=[self.appraisal.cycle.year]),
+        )
         self.appraisal.refresh_from_db()
         self.assertEqual(self.appraisal.targets.get().end_year_score, 4)
+
+    def test_dashboard_progress_reflects_each_appraisal_stage(self):
+        expected_progress = {
+            'draft': '0',
+            'returned_employee': '0',
+            'pending_manager': '20',
+            'returned_supervisor': '20',
+            'pending_hod': '40',
+            'returned_hod': '40',
+            'pending_hr': '60',
+            'completed': '100',
+        }
+
+        for status, percent in expected_progress.items():
+            with self.subTest(status=status):
+                self.appraisal.status = status
+                self.appraisal.save(update_fields=['status'])
+
+                response = self.client.get(reverse('employee_dashboard'))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, f'{percent}%')
+                self.assertContains(response, f'aria-valuenow="{percent}"')
+
+    def test_dashboard_appraisal_card_shows_friendly_status_and_submission_date(self):
+        self.appraisal.status = 'pending_manager'
+        self.appraisal.employee_signed_at = timezone.make_aware(datetime(2026, 10, 5))
+        self.appraisal.save(update_fields=['status', 'employee_signed_at'])
+
+        response = self.client.get(reverse('employee_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Pending Supervisor Review')
+        self.assertContains(response, '5 October 2026')
+        self.assertNotContains(response, 'SUBMITTED:</strong> Morgan Supervisor')
+        self.assertContains(response, 'Total appraisals')
+        self.assertContains(response, 'Incomplete')
+        self.assertContains(response, 'Submitted')
+        self.assertContains(response, '20% complete')
+        self.assertContains(
+            response,
+            'body:has(.role-dashboard-shell, .hr-dashboard-shell) > .navbar-appraisal',
+        )
+
+    def test_active_dashboard_shows_only_the_newest_active_cycle(self):
+        newer_cycle = AppraisalCycle.objects.create(year=2027, is_active=True)
+        older_cycle = self.appraisal.cycle
+
+        response = self.client.get(reverse('employee_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['active_appraisal_cards']), 1)
+        self.assertEqual(
+            response.context['active_appraisal_cards'][0]['cycle'],
+            newer_cycle,
+        )
+        self.assertContains(response, 'Cycle 2027 Appraisal')
+        self.assertNotContains(response, 'Cycle 2026 Appraisal')
+        self.assertTrue(
+            Appraisal.objects.filter(employee=self.profile, cycle=older_cycle).exists()
+        )
 
     def test_employee_sees_message_when_supervisor_is_not_assigned(self):
         self.appraisal.supervisor = None
@@ -132,6 +202,131 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         self.assertContains(response, 'supervisor-001')
         self.assertContains(response, 'Team Lead')
         self.assertContains(response, 'morgan@example.com')
+
+    def test_editable_appraisal_uses_form_branding_and_horizontal_steps(self):
+        self.appraisal.status = 'draft'
+        self.appraisal.save(update_fields=['status'])
+
+        response = self.client.get(reverse('fill_targets'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'MATHIAS CATHOLIC HOSPITAL, YEJI')
+        self.assertContains(response, '/static/images/ghana-coat-of-arms.png')
+        self.assertContains(response, '/static/images/mathias-catholic-hospital-logo.png')
+        self.assertContains(response, 'SECTION 2: Performance Planning Form')
+        self.assertContains(response, 'data-step-nav="0"')
+        self.assertContains(response, 'data-step-nav="1"')
+        self.assertContains(response, 'data-step-nav="2"')
+        self.assertContains(response, 'data-step-nav="3"')
+        self.assertContains(response, 'data-step-nav="4"')
+        self.assertContains(response, '/ 5 steps')
+
+    def test_preview_is_a_separate_live_read_only_final_step(self):
+        self.appraisal.status = 'draft'
+        self.appraisal.employee_first_name = 'Alex'
+        self.appraisal.employee_last_name = 'Morgan'
+        self.appraisal.employee_comments = 'I achieved my service goals.'
+        self.appraisal.save(update_fields=[
+            'status',
+            'employee_first_name',
+            'employee_last_name',
+            'employee_comments',
+        ])
+
+        response = self.client.get(reverse('fill_targets_year', args=[2026]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Review your appraisal before submitting')
+        self.assertContains(response, 'data-step-panel="4"')
+        self.assertContains(response, 'data-preview-name')
+        self.assertContains(response, 'data-preview-targets')
+        self.assertContains(response, 'data-preview-training')
+        self.assertContains(response, 'data-preview-core')
+        self.assertContains(response, 'data-preview-non-core')
+        self.assertContains(response, 'data-preview-comments')
+        self.assertContains(response, 'updateSubmissionPreview')
+        content = response.content.decode()
+        editable_step = content.index('data-step-panel="3"')
+        preview_step = content.index('data-step-panel="4"')
+        self.assertNotIn(
+            'Review your appraisal before submitting',
+            content[editable_step:preview_step],
+        )
+        preview_content = content[preview_step:]
+        self.assertIn('Review your appraisal before submitting', preview_content)
+        self.assertIn('SECTION 2: Performance Planning Form', preview_content)
+        self.assertIn('SECTION 5: Annual Appraisal — Core Competencies', preview_content)
+        self.assertIn('SECTION 5: Annual Appraisal — Non-Core Competencies', preview_content)
+
+    def test_core_and_non_core_competencies_are_separate_form_steps(self):
+        self.appraisal.status = 'draft'
+        self.appraisal.save(update_fields=['status'])
+        response = self.client.get(reverse('fill_targets'))
+        content = response.content.decode()
+        core_step = content.index('data-step-panel="2"')
+        non_core_step = content.index('data-step-panel="3"')
+
+        self.assertLess(
+            content.index('Core Competencies', core_step),
+            non_core_step,
+        )
+        self.assertGreater(
+            content.index('Non-Core Competencies', non_core_step),
+            non_core_step,
+        )
+        self.assertContains(response, 'background: linear-gradient(90deg, var(--form-rust-dark), var(--form-rust))')
+
+    def test_saving_employee_information_moves_to_performance_planning(self):
+        self.appraisal.status = 'draft'
+        self.appraisal.save(update_fields=['status'])
+
+        response = self.client.post(reverse('fill_targets'), {
+            'action': 'save_personal',
+            'employee_info-employee_comments': 'I met my service goals.',
+            'trainings-TOTAL_FORMS': '4',
+            'trainings-INITIAL_FORMS': '0',
+            'trainings-MIN_NUM_FORMS': '0',
+            'trainings-MAX_NUM_FORMS': '4',
+        })
+
+        self.assertRedirects(response, f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=1")
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.employee_comments, 'I met my service goals.')
+
+    def test_saving_a_specific_cycle_keeps_the_employee_on_that_cycle(self):
+        self.appraisal.status = 'draft'
+        self.appraisal.save(update_fields=['status'])
+        next_cycle = AppraisalCycle.objects.create(year=2027, is_active=True)
+        next_appraisal = Appraisal.objects.create(
+            employee=self.profile,
+            cycle=next_cycle,
+        )
+        data = {
+            'action': 'save_targets',
+            'targets-TOTAL_FORMS': '1',
+            'targets-INITIAL_FORMS': '0',
+            'targets-MIN_NUM_FORMS': '0',
+            'targets-MAX_NUM_FORMS': '1000',
+            'targets-0-key_result_area': '2026 service improvement',
+            'targets-0-target_description': 'Reduce response time.',
+            'targets-0-resources_required': 'Staff training',
+        }
+
+        response = self.client.post(
+            reverse('fill_targets_year', args=[self.appraisal.cycle.year]),
+            data,
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=2",
+        )
+        self.assertTrue(
+            self.appraisal.targets.filter(
+                key_result_area='2026 service improvement',
+            ).exists()
+        )
+        self.assertFalse(next_appraisal.targets.exists())
 
 
 class PublicHomePageTests(TestCase):
@@ -857,6 +1052,10 @@ class HRCompletedAppraisalTests(TestCase):
     def test_hr_dashboard_search_filters_completed_appraisals(self):
         response = self.client.get(reverse('hr_dashboard'))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'body:has(.role-dashboard-shell, .hr-dashboard-shell) > .navbar-appraisal',
+        )
         self.assertContains(response, 'Completed Appraisals')
         self.assertContains(response, 'Cycle year')
         self.assertContains(response, 'Appraisal analytics')
@@ -1137,7 +1336,11 @@ class EmployeeCompetencySelectionTests(TestCase):
         self.assertContains(response, 'Organize work and manage workload systematically.')
         self.assertContains(response, 'value="1:0"')
         self.assertContains(response, 'value="1:1"')
-        self.assertEqual(response.content.decode().count('<strong>Communication</strong>'), 1)
+        self.assertContains(response, 'Core Competencies')
+        self.assertContains(response, 'Non-Core Competencies')
+        self.assertContains(response, 'data-step-percent')
+        self.assertContains(response, 'data-step-state')
+        self.assertEqual(response.content.decode().count('<h3>Communication</h3>'), 1)
         self.assertContains(response, '01/01/2026')
         self.assertContains(response, '31/12/2026')
 
@@ -1178,24 +1381,31 @@ class EmployeeCompetencySelectionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Communication')
         self.assertContains(response, 'Communicate clearly with colleagues and customers.')
-        self.assertNotContains(response, 'Planning')
+        self.assertNotContains(response, 'Organize work and manage workload systematically.')
 
     def test_employee_must_select_a_competency_before_submission(self):
         response = self.client.post(
             reverse('submit_to_supervisor', args=[self.appraisal.id]),
         )
 
-        self.assertRedirects(response, reverse('fill_targets'))
+        self.assertRedirects(
+            response,
+            reverse('fill_targets_year', args=[self.appraisal.cycle.year]),
+        )
         self.appraisal.refresh_from_db()
         self.assertEqual(self.appraisal.status, 'draft')
 
     def test_save_and_submit_persists_selected_competencies_and_submits_appraisal(self):
+        data = self.competency_selection_data([self.competencies[0].id])
+        data.update({
+            'action': 'submit',
+            'employee_info-employee_comments': 'I achieved my service goals.',
+            'targets-0-key_result_area': 'Improve service response',
+            'targets-0-target_description': 'Reduce response time for patients.',
+        })
         response = self.client.post(
             reverse('fill_targets'),
-            {
-                **self.competency_selection_data([self.competencies[0].id]),
-                'action': 'submit',
-            },
+            data,
         )
 
         self.assertRedirects(response, reverse('employee_dashboard'))
@@ -1216,6 +1426,33 @@ class EmployeeCompetencySelectionTests(TestCase):
             supervisor_notification.url,
             reverse('supervisor_review', args=[self.appraisal.id]),
         )
+
+    def test_submit_with_no_complete_target_returns_to_performance_planning_step(self):
+        data = self.competency_selection_data([self.competencies[0].id])
+        data.update({
+            'action': 'submit',
+            'employee_info-employee_comments': 'I achieved my service goals.',
+        })
+
+        response = self.client.post(reverse('fill_targets'), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['current_step'], 1)
+        self.assertContains(response, 'Add at least one key result area and its target before submitting.')
+
+    def test_submit_without_employee_comments_returns_to_comments_step(self):
+        data = self.competency_selection_data([self.competencies[0].id])
+        data.update({
+            'action': 'submit',
+            'targets-0-key_result_area': 'Improve service response',
+            'targets-0-target_description': 'Reduce response time for patients.',
+        })
+
+        response = self.client.post(reverse('fill_targets'), data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['current_step'], 3)
+        self.assertContains(response, 'Add your overall assessment comments before submitting.')
 
     def test_employee_details_and_training_are_saved_as_appraisal_snapshot(self):
         data = self.competency_selection_data([self.competencies[0].id])
@@ -1308,7 +1545,7 @@ class EmployeeCompetencySelectionTests(TestCase):
         response = self.client.get(reverse('fill_targets'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Planning')
-        self.assertNotContains(response, 'Communication')
+        self.assertNotContains(response, 'Communicate clearly with colleagues and customers.')
         self.assertNotContains(response, 'Select Competencies')
 
     def test_employee_can_select_individual_statements(self):
@@ -1330,6 +1567,76 @@ class EmployeeCompetencySelectionTests(TestCase):
             [selected_statement],
         )
         self.assertFalse(
+            self.appraisal.competency_scores.filter(
+                competency=self.competencies[1],
+            ).exists()
+        )
+
+    def test_saving_targets_from_their_step_persists_and_continues(self):
+        data = self.competency_selection_data([])
+        data.update({
+            'action': 'save_targets',
+            'targets-0-key_result_area': 'Improve service response',
+            'targets-0-target_description': 'Reduce response time for patients.',
+            'targets-0-resources_required': 'Staff training',
+        })
+
+        response = self.client.post(reverse('fill_targets'), data)
+
+        self.assertRedirects(
+            response,
+            f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=2",
+        )
+        target = self.appraisal.targets.get()
+        self.assertEqual(target.key_result_area, 'Improve service response')
+        self.assertEqual(target.target_description, 'Reduce response time for patients.')
+
+    def test_saving_competencies_and_comments_from_their_step_persists(self):
+        data = self.competency_selection_data([self.competencies[0].id])
+        data.update({
+            'action': 'save_competencies',
+            'competency_statements': [f'{self.competencies[0].id}:0'],
+            'employee_info-employee_comments': 'I achieved my service goals.',
+        })
+
+        response = self.client.post(reverse('fill_targets'), data)
+
+        self.assertRedirects(
+            response,
+            f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=4",
+        )
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.employee_comments, 'I achieved my service goals.')
+        competency_score = self.appraisal.competency_scores.get(
+            competency=self.competencies[0],
+        )
+        self.assertEqual(
+            list(competency_score.statement_scores.values_list('statement', flat=True)),
+            [self.competencies[0].description_items[0]],
+        )
+
+    def test_saving_core_competencies_advances_to_non_core_step(self):
+        data = self.competency_selection_data([])
+        data.update({
+            'action': 'save_core_competencies',
+            'competency_statements': [
+                f'{self.competencies[0].id}:0',
+                f'{self.competencies[1].id}:0',
+            ],
+        })
+
+        response = self.client.post(reverse('fill_targets'), data)
+
+        self.assertRedirects(
+            response,
+            f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=3",
+        )
+        self.assertTrue(
+            self.appraisal.competency_scores.filter(
+                competency=self.competencies[0],
+            ).exists()
+        )
+        self.assertTrue(
             self.appraisal.competency_scores.filter(
                 competency=self.competencies[1],
             ).exists()

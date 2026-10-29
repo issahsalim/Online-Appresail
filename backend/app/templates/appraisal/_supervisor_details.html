@@ -1,25 +1,23 @@
-<div class="card mb-4">
-    <div class="card-header bg-secondary text-white">Supervisor details</div>
-    <div class="card-body">
+<section class="appraisal-paper" aria-labelledby="appraiser-information-readonly-heading">
+    <h2 class="appraisal-section-title" id="appraiser-information-readonly-heading">Supervisor details</h2>
+    <div class="appraisal-section-body">
         {% if supervisor %}
-            <div class="row g-3">
-                <div class="col-md-4">
+            <div class="appraisal-fields">
+                <div class="appraisal-field">
                     <strong>Name:</strong>
                     {% if supervisor.title %}
                         {{ supervisor.get_title_display }}
-                        {% if supervisor.title == 'other' and supervisor.other_title %}
-                            ({{ supervisor.other_title }})
-                        {% endif %}
+                        {% if supervisor.title == 'other' and supervisor.other_title %}({{ supervisor.other_title }}){% endif %}
                     {% endif %}
                     {{ supervisor.user.get_full_name|default:supervisor.user.username }}
                     {% if supervisor.other_names %} {{ supervisor.other_names }}{% endif %}
                 </div>
-                <div class="col-md-4"><strong>Staff ID:</strong> {{ supervisor.user.username }}</div>
-                <div class="col-md-4"><strong>Job title:</strong> {{ supervisor.job_title|default:"—" }}</div>
-                <div class="col-md-4"><strong>Email:</strong> {{ supervisor.user.email|default:"—" }}</div>
+                <div class="appraisal-field"><strong>Staff ID:</strong> {{ supervisor.user.username }}</div>
+                <div class="appraisal-field"><strong>Job title:</strong> {{ supervisor.job_title|default:"—" }}</div>
+                <div class="appraisal-field"><strong>Email:</strong> {{ supervisor.user.email|default:"—" }}</div>
             </div>
         {% else %}
-            <p class="text-muted mb-0">A supervisor has not been assigned yet.</p>
+            <p class="mb-0">A supervisor has not been assigned yet.</p>
         {% endif %}
     </div>
-</div>
+</section>

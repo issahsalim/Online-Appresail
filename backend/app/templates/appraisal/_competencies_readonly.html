@@ -1,0 +1,37 @@
+<section class="appraisal-paper" aria-labelledby="competencies-readonly-heading">
+    <h2 class="appraisal-section-title" id="competencies-readonly-heading">SECTION 3: Competencies Assessment</h2>
+    <div class="appraisal-section-body">
+        {% for score in competencies %}
+            <h3 class="appraisal-competency-title">
+                {{ score.competency.name }}
+                <span>{{ score.competency.get_competency_type_display }}</span>
+            </h3>
+            <div class="table-responsive mb-3">
+                <table class="table table-bordered align-middle">
+                    <thead>
+                        <tr><th>Selected competency statement</th><th>Mid-year progress</th><th>Mid-year remark</th><th>End-year score (1-5)</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for statement in score.statement_scores.all %}
+                            <tr>
+                                <td>{{ statement.statement }}</td>
+                                <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
+                                <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                                <td>{% if statement.end_year_score != None %}{{ statement.end_year_score }} / 5{% else %}Not scored yet{% endif %}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td>{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td>
+                                <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
+                                <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                                <td>{% if score.end_year_score != None %}{{ score.end_year_score }} / 5{% else %}Not scored yet{% endif %}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% empty %}
+            <p class="mb-0">No competency statements have been selected.</p>
+        {% endfor %}
+    </div>
+</section>

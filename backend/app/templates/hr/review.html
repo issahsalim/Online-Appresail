@@ -1,9 +1,81 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-5 mb-5">
-    <h3>Final HR Approval for: <strong>{{ appraisal.employee.user.username }}</strong></h3>
-    <hr>
+<div class="container mt-4 mb-5 hr-review-page">
+    <style>
+        .hr-review-page { color: #263238; max-width: 1180px; }
+        .review-hero {
+            background: linear-gradient(120deg, #23343c, #344a54);
+            border-radius: 10px;
+            box-shadow: 0 12px 28px rgba(35, 52, 60, .16);
+            color: #fff;
+            margin-bottom: 1.25rem;
+            padding: clamp(1.25rem, 3vw, 2rem);
+        }
+        .review-hero h1 { font-size: clamp(1.35rem, 3vw, 2rem); font-weight: 750; margin: 0 0 .4rem; }
+        .review-hero p { color: #d2dce0; margin: 0; }
+        .review-kicker { color: #f0b399; font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+        .hr-review-page .card {
+            border: 1px solid #e0e5e7;
+            border-radius: 8px;
+            box-shadow: 0 5px 18px rgba(38, 56, 63, .055);
+            overflow: hidden;
+        }
+        .hr-review-page .card-header {
+            background: #f5f7f7;
+            border-bottom: 1px solid #e3e8ea;
+            color: #2c4048;
+            font-weight: 750;
+            padding: .85rem 1rem;
+        }
+        .hr-review-page .card-header.bg-dark,
+        .hr-review-page .card-header.bg-secondary,
+        .hr-review-page .card-header.bg-success {
+            background: #344a54 !important;
+            color: #fff !important;
+        }
+        .hr-review-page .table { margin-bottom: 0; }
+        .hr-review-page .table thead th { background: #f5f7f7; color: #354952; font-size: .78rem; }
+        .hr-review-page .table > :not(caption) > * > * { border-color: #e0e5e7; padding: .7rem; }
+        .hr-review-page .border-success { border-color: #b8d9c8 !important; }
+        .hr-review-page .border-success > .card-header { border-left: 4px solid #26845b; }
+        .hr-review-page label { color: #354952; font-size: .82rem; font-weight: 700; }
+        .hr-review-page input,
+        .hr-review-page select,
+        .hr-review-page textarea {
+            border: 1px solid #cfd8dc;
+            border-radius: 5px;
+            min-height: 40px;
+            padding: .5rem .65rem;
+            width: 100%;
+        }
+        .hr-review-page input:focus,
+        .hr-review-page select:focus,
+        .hr-review-page textarea:focus {
+            border-color: #a43a10;
+            box-shadow: 0 0 0 .18rem rgba(164, 58, 16, .12);
+        }
+        .hr-review-page .btn {
+            border-radius: 5px;
+            font-size: .85rem;
+            font-weight: 700;
+            min-height: 42px;
+            padding: .6rem .95rem;
+        }
+        .hr-review-page .btn-success { background: #26845b; border-color: #26845b; }
+        .hr-review-page .return-review-form { border-color: #e4c982 !important; }
+        .hr-review-page .return-review-form > .card-header { background: #fbf5e7; border-left: 4px solid #d49b18; }
+        @media (max-width: 575.98px) {
+            .hr-review-page .card-body { padding: .9rem; }
+            .hr-review-page button { width: 100%; }
+        }
+    </style>
+    <header class="review-hero">
+        <span class="review-kicker">Final HR review · {{ appraisal.cycle.year }}</span>
+        <h1>Final approval for {{ appraisal.employee.user.username }}</h1>
+        <p>Review the appraisal scores and HOD comments before locking the final result.</p>
+    </header>
     {% include 'appraisal/_employee_details.html' %}
+    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
     {% include 'appraisal/_training.html' %}
 
     {% if return_history %}
@@ -21,103 +93,46 @@
         </div>
     {% endif %}
 
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-dark text-white">Employee & Supervisor</div>
-                <div class="card-body">
-                    <p><strong>Employee:</strong> {{ appraisal.employee.user.username }} ({{ appraisal.employee.department.name }})</p>
-                    <p><strong>Supervisor:</strong> {{ appraisal.supervisor.user.username }}</p>
-                    <p><strong>HOD:</strong> {{ appraisal.hod.user.username }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-dark text-white">HOD Comments</div>
-                <div class="card-body">
-                    <p>{{ appraisal.hod_comments|default:"No HOD comments provided." }}</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- SCORES (READ ONLY) -->
-    <div class="card mb-4">
-        <div class="card-header bg-secondary text-white">Final Scores</div>
-        <div class="card-body">
-            <table class="table table-bordered table-sm">
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Item</th>
-                        <th>Score (1-5)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for target in targets %}
-                    <tr>
-                        <td>Target</td>
-                        <td>{{ target.key_result_area }}</td>
-                        <td>{{ target.end_year_score|default:"N/A" }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% for comp in competencies %}
-                    <tr>
-                        <td>Competency</td>
-                        <td>
-                            <strong>{{ comp.competency.name }}</strong>
-                            <div><span class="badge bg-primary-subtle text-primary">{{ comp.competency.get_competency_type_display }}</span></div>
-                            <ul class="text-muted mt-1">
-                                {% for statement_score in comp.statement_scores.all %}
-                                    <li>{{ statement_score.statement }}</li>
-                                {% empty %}
-                                    <li>{% include 'appraisal/_competency_description.html' with competency=comp.competency %}</li>
-                                {% endfor %}
-                            </ul>
-                        </td>
-                        <td>
-                            {% for statement_score in comp.statement_scores.all %}
-                                <div>{{ statement_score.end_year_score|default:"N/A" }} / 5</div>
-                            {% empty %}
-                                {{ comp.end_year_score|default:"N/A" }}
-                            {% endfor %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {% include 'appraisal/_targets_readonly.html' %}
+    {% include 'appraisal/_competencies_readonly.html' %}
+    {% include 'appraisal/_annual_appraisal_results.html' %}
+    {% include 'appraisal/_appraisal_comment_sections.html' %}
+    {% include 'appraisal/_hod_comment_section.html' %}
 
     <!-- HR COMMENTS FORM -->
-    <div class="card mb-4 border-success">
-        <div class="card-header bg-success text-white">Final HR Approval</div>
-        <div class="card-body">
-            <form method="POST">
-                {% csrf_token %}
-                <div class="mb-3">
-                    <label class="form-label">HR Final Comments</label>
-                    {{ form.hr_comments }}
-                </div>
-                
-                <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure? This will calculate the final score and LOCK the form permanently.')">
-                    Final Approve & Lock
-                </button>
-                <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary">Cancel</a>
-            </form>
-        </div>
-
-        <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 border-warning">
+    <section class="appraisal-paper mb-4 border-success">
+        <h2 class="appraisal-section-title">Final HR Approval</h2>
+        <form method="POST" class="appraisal-section-body">
             {% csrf_token %}
-            <div class="card-header bg-warning">Return to HOD for Review</div>
-            <div class="card-body">
-                {{ return_form.comment.label_tag }}
-                {{ return_form.comment }}
-                {{ return_form.comment.errors }}
-                <button type="submit" class="btn btn-warning mt-3">Return to HOD</button>
+            <div class="mb-3">
+                <label class="form-label" for="{{ form.hr_comments.id_for_label }}">HR Final Comments</label>
+                {{ form.hr_comments }}
+                {{ form.hr_comments.errors }}
             </div>
+            <div class="appraisal-signature-row"><span><strong>HR signature:</strong> {{ request.user.get_full_name|default:request.user.username }}</span><span><strong>Date:</strong> {% if appraisal.hr_approved_at %}{{ appraisal.hr_approved_at|date:"d/m/Y" }}{% else %}Recorded when approved{% endif %}</span></div>
+            <button
+                type="submit"
+                class="btn btn-success mt-3"
+                data-confirm="This will calculate the final score and permanently lock the appraisal form."
+                data-confirm-title="Final approval"
+                data-confirm-label="Approve and lock"
+                data-confirm-tone="danger"
+            >
+                Final Approve &amp; Lock
+            </button>
+            <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary mt-3">Cancel</a>
         </form>
-    </div>
+    </section>
+
+    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 border-warning return-review-form">
+        {% csrf_token %}
+        <div class="card-header bg-warning">Return to HOD for Review</div>
+        <div class="card-body">
+            {{ return_form.comment.label_tag }}
+            {{ return_form.comment }}
+            {{ return_form.comment.errors }}
+            <button type="submit" class="btn btn-warning mt-3">Return to HOD</button>
+        </div>
+    </form>
 </div>
 {% endblock %}

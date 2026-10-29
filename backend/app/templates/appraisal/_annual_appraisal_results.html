@@ -1,0 +1,49 @@
+<section class="appraisal-paper" aria-labelledby="overall-assessment-readonly-heading">
+    <h2 class="appraisal-section-title" id="overall-assessment-readonly-heading">
+        <span>SECTION 5: Annual Appraisal</span>
+        <span>(Continuation)</span>
+    </h2>
+    <div class="appraisal-section-body">
+        <h3 class="appraisal-subsection-title">Overall Assessment</h3>
+        <div class="appraisal-results-lines">
+            <p><strong>Performance Assessment (M)</strong><span>=</span><span>{{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>Core Competencies Assessment (N)</strong><span>=</span><span>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>Non-Core Competencies Assessment (O)</strong><span>=</span><span>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>Overall Total</strong><span>=</span><span>{{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</span></p>
+        </div>
+        <p class="appraisal-final-rating"><strong>Overall Performance Rating</strong><span>=</span>
+            {% if score_breakdown.total is not None %}
+                {{ score_breakdown.total|floatformat:2 }} / 5 × 100 =
+                {% if score_breakdown.percentage is not None %}{{ score_breakdown.percentage|floatformat:2 }}%{% else %}Pending{% endif %}
+                <strong>(
+                    {% if score_breakdown.percentage >= 80 %}Outstanding
+                    {% elif score_breakdown.percentage >= 65 %}Very Good
+                    {% elif score_breakdown.percentage >= 50 %}Satisfactory
+                    {% elif score_breakdown.percentage >= 41 %}Needs Improvement
+                    {% else %}Unsatisfactory{% endif %}
+                )</strong>
+            {% else %}
+                Pending
+            {% endif %}
+        </p>
+        <p><strong>NB:</strong> Please use the scale below to interpret the overall performance of the appraisee.</p>
+        <p class="appraisal-subsection-title"><u>Overall Performance Rating</u></p>
+        <ul class="appraisal-rating-list">
+            <li>{% if score_breakdown.percentage is not None and score_breakdown.percentage >= 80 %}☒{% else %}☐{% endif %} <strong>1 - Outstanding Performance:</strong> Employee has in all areas exceeded agreed expectations in achieving targets.</li>
+            <li>{% if score_breakdown.percentage is not None and score_breakdown.percentage >= 65 and score_breakdown.percentage < 80 %}☒{% else %}☐{% endif %} <strong>2 - Very Good Performance:</strong> Employee has met all expectations in achieving set targets.</li>
+            <li>{% if score_breakdown.percentage is not None and score_breakdown.percentage >= 50 and score_breakdown.percentage < 65 %}☒{% else %}☐{% endif %} <strong>3 - Satisfactory / Acceptable Performance:</strong> Employee has met most agreed expectations in achieving set targets.</li>
+            <li>{% if score_breakdown.percentage is not None and score_breakdown.percentage >= 41 and score_breakdown.percentage < 50 %}☒{% else %}☐{% endif %} <strong>4 - Needs Improvement:</strong> Employee has not met most agreed expectations in achieving set targets.</li>
+            <li>{% if score_breakdown.percentage is not None and score_breakdown.percentage < 41 %}☒{% else %}☐{% endif %} <strong>5 - Unacceptable Performance:</strong> Employee has failed to meet agreed expectations in achieving set targets.</li>
+        </ul>
+        <div class="table-responsive">
+            <table class="table table-bordered appraisal-rating-scale">
+                <thead><tr><th></th><th colspan="5">SCALE</th></tr></thead>
+                <tbody>
+                    <tr><th>Weight</th><td>80% &amp; above</td><td>79 - 65%</td><td>64 - 50%</td><td>49 - 41%</td><td>40% &amp; below</td></tr>
+                    <tr><th>Score</th><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td></tr>
+                    <tr><th>Rating</th><td>Outstanding</td><td>Very Good</td><td>Satisfactory</td><td>Needs Improvement</td><td>Unsatisfactory</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

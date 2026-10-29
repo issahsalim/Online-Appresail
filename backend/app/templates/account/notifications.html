@@ -78,6 +78,11 @@
             {% endif %}
         </header>
 
+        {% for message in messages %} 
+                <div class="">
+                    {{message}}
+                </div>
+        {%endfor%}
         <section class="notifications-list" aria-label="Your notifications">
             {% for notification in notification_page %}
                 <article class="notification-row{% if not notification.is_read %} unread{% endif %}">
@@ -85,11 +90,12 @@
                     <div class="notification-content">
                         <form action="{% url 'open_notification' notification.id %}" method="post">
                             {% csrf_token %}
-                            <button type="submit">
-                                <span class="notification-title">{{ notification.title }}</span>
+                            
+                                <span class="notification-title">{{ notification.title }} </span>
                                 <span class="notification-message">{{ notification.message }}</span>
                                 <span class="notification-time">{{ notification.created_at|date:"M j, Y, P" }}</span>
-                            </button>
+                                  <a href="{% url 'delete_noti' notification.id %}">delete</a> 
+                                 
                         </form>
                     </div>
                 </article>

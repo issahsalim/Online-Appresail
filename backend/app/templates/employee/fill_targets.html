@@ -1,270 +1,1181 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2>My Appraisal - {{ appraisal.cycle.year }}</h2>
-    <p>Status: <strong>{{ appraisal.get_status_display }}</strong></p>
+<style>
+    .appraisal-form-page {
+        --form-rust: #a43a10;
+        --form-rust-dark: #852d0b;
+        --form-ink: #252525;
+        --form-muted: #626262;
+        color: var(--form-ink);
+        margin: 1.5rem auto 3rem;
+        max-width: 1180px;
+        padding: 0 1rem;
+    }
+    .appraisal-toolbar {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .75rem;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+    .appraisal-status {
+        background: #f7e9e2;
+        border: 1px solid #e8c5b4;
+        border-radius: 999px;
+        color: var(--form-rust-dark);
+        display: inline-flex;
+        font-size: .82rem;
+        font-weight: 700;
+        padding: .4rem .8rem;
+    }
+    .appraisal-document {
+        background: #fff;
+        border: 2px solid var(--form-rust);
+        box-shadow: 0 12px 36px rgba(62, 33, 20, .09);
+        padding: clamp(.85rem, 2.2vw, 1.5rem);
+    }
+    .appraisal-document-header {
+        align-items: center;
+        display: grid;
+        gap: clamp(.5rem, 2vw, 1.5rem);
+        grid-template-columns: minmax(64px, 120px) minmax(0, 1fr) minmax(64px, 120px);
+        margin: 0 auto 1.25rem;
+        max-width: 1050px;
+        text-align: center;
+    }
+    .appraisal-document-header img {
+        height: auto;
+        justify-self: center;
+        max-height: 100px;
+        max-width: 100%;
+        object-fit: contain;
+        width: 110px;
+    }
+    .appraisal-document-header h1 {
+        font-size: clamp(1.05rem, 2.4vw, 1.8rem);
+        font-weight: 800;
+        letter-spacing: .025em;
+        margin: 0 0 .25rem;
+    }
+    .appraisal-document-header p {
+        font-size: clamp(.69rem, 1.35vw, .95rem);
+        font-weight: 750;
+        line-height: 1.35;
+        margin: .2rem 0;
+    }
+    .appraisal-document-header .appraisal-document-subtitle {
+        font-size: clamp(.62rem, 1.15vw, .82rem);
+        font-weight: 600;
+    }
+    .appraisal-confidential {
+        color: var(--form-rust);
+        display: inline-block;
+        font-size: .78rem;
+        letter-spacing: .06em;
+        margin-top: .15rem;
+    }
+    .appraisal-page-title {
+        align-items: flex-start;
+        border-bottom: 1px solid #e5d8d1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem 1rem;
+        justify-content: space-between;
+        margin: 0 0 1.25rem;
+        padding-bottom: .85rem;
+    }
+    .appraisal-page-title h2 {
+        font-size: clamp(1.25rem, 2.6vw, 1.75rem);
+        font-weight: 750;
+        margin: 0;
+    }
+    .appraisal-stepper {
+        background: #f7f9fa;
+        border: 1px solid #e4eaed;
+        border-radius: 15px;
+        margin: 0 auto 1.5rem;
+        max-width: 980px;
+        padding: 1.1rem;
+    }
+    .appraisal-stepper-header {
+        align-items: center;
+        display: flex;
+        gap: .75rem;
+        justify-content: space-between;
+        margin-bottom: .9rem;
+    }
+    .appraisal-stepper-title {
+        color: #173747;
+        font-size: .84rem;
+        font-weight: 750;
+        margin: 0;
+    }
+    .appraisal-stepper-count {
+        color: #72828b;
+        font-size: .78rem;
+        white-space: nowrap;
+    }
+    .appraisal-stepper-count strong,
+    .appraisal-stepper-percent { color: var(--form-rust-dark); }
+    .appraisal-stepper-overall { margin-bottom: 1.2rem; }
+    .appraisal-stepper-overall-label {
+        color: #72828b;
+        display: flex;
+        font-size: .72rem;
+        font-weight: 750;
+        justify-content: space-between;
+        letter-spacing: .04em;
+        margin-bottom: .4rem;
+        text-transform: uppercase;
+    }
+    .appraisal-step-track {
+        background: #eadfd9;
+        border-radius: 999px;
+        height: 8px;
+        overflow: hidden;
+    }
+    .appraisal-step-track-fill {
+        background: linear-gradient(90deg, var(--form-rust-dark), var(--form-rust));
+        border-radius: inherit;
+        display: block;
+        height: 100%;
+        transition: width .25s ease;
+        width: 0;
+    }
+    .appraisal-step-list {
+        display: grid;
+        gap: .25rem;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        position: relative;
+    }
+    .appraisal-step-list li { min-width: 0; position: relative; }
+    .appraisal-step-list li:not(:last-child)::after {
+        background: #eadfd9;
+        content: "";
+        height: 3px;
+        left: 50%;
+        position: absolute;
+        right: -50%;
+        top: 16px;
+        z-index: 0;
+    }
+    .appraisal-step-list li.is-complete::after { background: var(--form-rust); }
+    .appraisal-step-button {
+        align-items: center;
+        background: transparent;
+        border: 0;
+        color: #777;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: .45rem;
+        min-width: 0;
+        padding: 0 .25rem;
+        position: relative;
+        text-align: center;
+        width: 100%;
+        z-index: 1;
+    }
+    .appraisal-step-number {
+        align-items: center;
+        background: #fbf5f2;
+        border: 2px solid #e8c5b4;
+        border-radius: 50%;
+        color: var(--form-muted);
+        display: inline-flex;
+        flex: 0 0 34px;
+        font-size: .72rem;
+        font-weight: 750;
+        height: 34px;
+        justify-content: center;
+        transition: .2s ease;
+        width: 34px;
+    }
+    .appraisal-step-copy { display: grid; min-width: 0; }
+    .appraisal-step-label { color: inherit; font-size: .76rem; font-weight: 750; line-height: 1.3; }
+    .appraisal-step-note { color: #777; font-size: .65rem; line-height: 1.25; margin-top: .12rem; }
+    .appraisal-step-button.is-current { color: var(--form-rust-dark); }
+    .appraisal-step-button.is-current .appraisal-step-number,
+    .appraisal-step-button.is-complete .appraisal-step-number {
+        background: var(--form-rust);
+        border-color: var(--form-rust);
+        color: #fff;
+    }
+    .appraisal-step-button.is-current .appraisal-step-number {
+        background: #fff;
+        border: 3px solid var(--form-rust);
+        box-shadow: 0 0 0 4px rgba(164, 58, 16, .13);
+        color: var(--form-rust-dark);
+    }
+    .appraisal-step-state {
+        color: #777;
+        display: block;
+        font-size: .63rem;
+        font-weight: 600;
+        margin-top: .15rem;
+    }
+    .appraisal-step-button.is-current .appraisal-step-state { color: var(--form-rust-dark); }
+    .appraisal-section {
+        border: 1px solid var(--form-rust);
+        margin-bottom: 1.25rem;
+        overflow: hidden;
+    }
+    .appraisal-section-heading {
+        background: var(--form-rust);
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 750;
+        margin: 0;
+        padding: .7rem .85rem;
+    }
+    .appraisal-section-body { padding: clamp(.8rem, 2vw, 1.25rem); }
+    .appraisal-section-intro {
+        color: #3f3f3f;
+        margin: 0 0 1rem;
+    }
+    .appraisal-period {
+        align-items: center;
+        background: #fbf5f1;
+        border-bottom: 1px solid #e6c6b5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .4rem 1rem;
+        padding: .75rem .85rem;
+    }
+    .appraisal-period-label {
+        background: var(--form-rust);
+        color: #fff;
+        font-size: .78rem;
+        font-weight: 750;
+        letter-spacing: .03em;
+        padding: .55rem .7rem;
+    }
+    .appraisal-fields-grid {
+        display: grid;
+        gap: .9rem 1.1rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .appraisal-field { min-width: 0; }
+    .appraisal-field label {
+        display: block;
+        font-size: .87rem;
+        font-weight: 700;
+        margin-bottom: .32rem;
+    }
+    .appraisal-field input,
+    .appraisal-field select,
+    .appraisal-field textarea,
+    .appraisal-table input,
+    .appraisal-table select,
+    .appraisal-table textarea {
+        border: 1px solid #aaa;
+        border-radius: 3px;
+        font-size: .9rem;
+        max-width: 100%;
+        padding: .55rem .6rem;
+        width: 100%;
+    }
+    .appraisal-field textarea,
+    .appraisal-table textarea { min-height: 86px; }
+    .appraisal-table {
+        border-color: #494949;
+        margin-bottom: 0;
+        min-width: 720px;
+    }
+    .appraisal-table thead th {
+        background: #f8f3f0;
+        font-size: .82rem;
+        text-align: center;
+        vertical-align: middle;
+    }
+    .appraisal-table td,
+    .appraisal-table th { border-color: #777; padding: .55rem; vertical-align: top; }
+    .appraisal-table .appraisal-row-number { font-weight: 700; text-align: center; width: 48px; }
+    .appraisal-table-errors { color: #b02a37; font-size: .8rem; list-style: none; margin: .25rem 0 0; padding: 0; }
+    .appraisal-help { color: #555; font-size: .85rem; margin-bottom: .85rem; }
+    .appraisal-competency-grid {
+        display: grid;
+        gap: .9rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .appraisal-competency-category {
+        border: 1px solid #e4eaed;
+        border-radius: 10px;
+        margin-top: 1rem;
+        padding: .85rem;
+    }
+    .appraisal-competency-category-heading {
+        color: #173747;
+        font-size: .92rem;
+        font-weight: 750;
+        margin: 0 0 .75rem;
+    }
+    .appraisal-competency-card {
+        border: 1px solid #d5c2b8;
+        border-top: 4px solid var(--form-rust);
+        min-width: 0;
+        padding: .9rem;
+    }
+    .appraisal-competency-card h3 {
+        font-size: .98rem;
+        font-weight: 750;
+        margin: 0;
+    }
+    .appraisal-competency-statement {
+        align-items: flex-start;
+        display: flex;
+        gap: .55rem;
+        margin: .65rem 0 0;
+    }
+    .appraisal-competency-statement input { flex: 0 0 auto; margin-top: .25rem; }
+    .appraisal-competency-statement label { line-height: 1.4; }
+    .appraisal-navigation {
+        align-items: center;
+        border-top: 1px solid #e5d8d1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: .65rem;
+        justify-content: space-between;
+        margin-top: 1rem;
+        padding-top: 1rem;
+    }
+    .appraisal-navigation-group { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .appraisal-button-primary {
+        background: var(--form-rust);
+        border: 1px solid var(--form-rust);
+        color: #fff;
+    }
+    .appraisal-button-primary:hover { background: var(--form-rust-dark); border-color: var(--form-rust-dark); color: #fff; }
+    .appraisal-button-outline {
+        background: #fff;
+        border: 1px solid var(--form-rust);
+        color: var(--form-rust-dark);
+    }
+    .appraisal-button-outline:hover { background: #fbf0e9; color: var(--form-rust-dark); }
+    .appraisal-paper {
+        background: #fff;
+        border: 1px solid var(--form-rust);
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+    .appraisal-form-page .appraisal-section-title {
+        background: var(--form-rust);
+        color: #fff;
+        font-weight: 750;
+        padding: .7rem .85rem;
+    }
+    .appraisal-readonly-card {
+        border: 1px solid #dfd3cd;
+        border-radius: 4px;
+        margin: .85rem 0;
+        padding: 1rem;
+    }
+    .appraisal-readonly-card h3 { font-size: 1rem; font-weight: 750; }
+    .appraisal-readonly-card p:last-child { margin-bottom: 0; }
+    .appraisal-confirmation {
+        border: 0;
+        border-radius: 8px;
+        box-shadow: 0 20px 70px rgba(0, 0, 0, .28);
+        max-width: min(460px, calc(100vw - 2rem));
+        padding: 1.5rem;
+        width: 100%;
+    }
+    .appraisal-confirmation::backdrop { background: rgba(20, 20, 20, .58); }
+    .appraisal-confirmation h2 { font-size: 1.2rem; font-weight: 750; }
+    .appraisal-js .appraisal-step-panel:not(.is-active) { display: none; }
+    @media (max-width: 640px) {
+        .appraisal-document { padding: .65rem; }
+        .appraisal-document-header { grid-template-columns: 52px minmax(0, 1fr) 52px; gap: .35rem; }
+        .appraisal-document-header img { max-height: 58px; width: 52px; }
+        .appraisal-document-header h1 { font-size: .93rem; }
+        .appraisal-document-header p { font-size: .65rem; }
+        .appraisal-document-header .appraisal-document-subtitle { font-size: .58rem; }
+        .appraisal-confidential { font-size: .64rem; }
+        .appraisal-step-list {
+            display: flex;
+            gap: .4rem;
+            overflow-x: auto;
+            padding: 0 0 .45rem;
+            scroll-snap-type: x mandatory;
+        }
+        .appraisal-step-list li { flex: 1 0 135px; scroll-snap-align: start; }
+        .appraisal-fields-grid,
+        .appraisal-competency-grid { grid-template-columns: minmax(0, 1fr); }
+        .appraisal-navigation { align-items: stretch; }
+        .appraisal-navigation-group { width: 100%; }
+        .appraisal-navigation .btn { flex: 1 1 auto; }
+    }
+    @media print {
+        body { background: #fff !important; }
+        body > nav,
+        .no-print,
+        .messages { display: none !important; }
+        .appraisal-form-page { margin: 0 !important; max-width: none !important; padding: 0 !important; }
+        .appraisal-document { border: 0; box-shadow: none; padding: 0; }
+        .appraisal-stepper { display: none !important; }
+        .appraisal-section,
+        .appraisal-paper { break-inside: avoid; box-shadow: none !important; }
+        .appraisal-readonly-card { break-inside: avoid; }
+    }
+</style>
 
-    {% if read_only %}
-        {% include 'appraisal/_employee_details.html' %}
-    {% else %}
-        {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
-    {% endif %}
-
-    {% if return_history %}
-        <div class="card mb-4 border-warning">
-            <div class="card-header bg-warning">Return history and required corrections</div>
-            <div class="card-body">
-                {% for decision in return_history %}
-                    <div class="mb-3">
-                        <strong>{{ decision.get_stage_display }} — {{ decision.reviewer_name }}</strong>
-                        <small class="text-muted">{{ decision.created_at }}</small>
-                        <p class="mb-0">{{ decision.comment }}</p>
-                    </div>
-                {% endfor %}
-            </div>
+<main class="appraisal-form-page{% if print_mode %} appraisal-print-mode{% endif %}">
+    {% if not print_mode %}
+        <div class="appraisal-toolbar no-print">
+            <a href="{% url 'employee_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+            {% if read_only and allow_pdf and appraisal.status == 'completed' %}
+                <a href="{% url 'employee_appraisal_pdf' appraisal.id %}" class="btn btn-outline-primary">Print appraisal</a>
+            {% endif %}
         </div>
     {% endif %}
 
-    {% if read_only %}
-        <h3>Targets and Supervisor Review</h3>
-        {% for target in targets %}
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5>{{ target.key_result_area }}</h5>
-                    <p><strong>Target:</strong> {{ target.target_description|default:"Not provided" }}</p>
-                    <p><strong>Resources required:</strong> {{ target.resources_required|default:"Not provided" }}</p>
-                    <p><strong>Mid-year progress:</strong> {{ target.get_mid_year_progress_display|default:"Not reviewed yet" }}</p>
-                    <p><strong>Mid-year remark:</strong> {{ target.get_mid_year_remark_display|default:"Not reviewed yet" }}</p>
-                    <p><strong>End-year assessment:</strong> {{ target.get_end_year_assessment_display|default:"Not reviewed yet" }}</p>
-                    <p><strong>End-year score:</strong> {{ target.end_year_score|default:"Not scored yet" }}</p>
-                    <p><strong>End-year comment:</strong> {{ target.get_end_year_comment_display|default:"Not reviewed yet" }}</p>
-                </div>
+    <article class="appraisal-document">
+        <header class="appraisal-document-header">
+            <img src="{% static 'images/ghana-coat-of-arms.png' %}" alt="Ghana coat of arms">
+            <div>
+                <h1>MATHIAS CATHOLIC HOSPITAL, YEJI</h1>
+                <p>PUBLIC SERVICES PERFORMANCE MANAGEMENT</p>
+                <p class="appraisal-document-subtitle">(STAFF PERFORMANCE PLANNING, REVIEW AND APPRAISAL FORM)</p>
+                <strong class="appraisal-confidential">STRICTLY CONFIDENTIAL</strong>
             </div>
-        {% empty %}
-            <p>No targets have been added to this appraisal.</p>
-        {% endfor %}
+            <img src="{% static 'images/mathias-catholic-hospital-logo.png' %}" alt="Mathias Catholic Hospital logo">
+        </header>
 
-        <h3>Competency Review</h3>
-        {% for group in score_breakdown.groups %}
-            {% with score=group.score %}
-            <div class="card mb-3 border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-                        <h5 class="card-title mb-0">{{ score.competency.name }}</h5>
-                        <span class="badge bg-primary-subtle text-primary">{{ score.competency.get_competency_type_display }}</span>
+            <div class="appraisal-page-title">
+                <!-- <h2>My Appraisal — {{ appraisal.cycle.year }}</h2> -->
+                <span class="appraisal-status ">Status: {{ appraisal.get_status_display }}</span>
+            </div>
+
+        {% if not read_only %}
+            <nav class="appraisal-stepper no-print" aria-label="Appraisal form progress">
+                <div class="appraisal-stepper-header">
+                    <h2 class="appraisal-stepper-title">Appraisal stages</h2>
+                    <span class="appraisal-stepper-count"><strong data-step-count>1</strong> / 5 steps</span>
+                </div>
+                <div class="appraisal-stepper-overall">
+                    <div class="appraisal-stepper-overall-label">
+                        <span>Form progress</span>
+                        <strong class="appraisal-stepper-percent" data-step-percent>0%</strong>
                     </div>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-bordered align-middle">
+                    <div
+                        class="appraisal-step-track"
+                        role="progressbar"
+                        aria-label="Appraisal form progress"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="0"
+                        data-step-track
+                    >
+                        <span class="appraisal-step-track-fill" data-step-progress></span>
+                    </div>
+                </div>
+                <ol class="appraisal-step-list">
+                    <li>
+                        <button type="button" class="appraisal-step-button" data-step-nav="0" aria-label="Step 1: Employee information and training">
+                            <span class="appraisal-step-number" data-step-number="1">1</span>
+                            <span class="appraisal-step-copy">
+                                <span class="appraisal-step-label">Employee information</span>
+                                <span class="appraisal-step-note">Personal details and training</span>
+                                <span class="appraisal-step-state" data-step-state>In progress</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="appraisal-step-button" data-step-nav="1" aria-label="Step 2: Performance planning">
+                            <span class="appraisal-step-number" data-step-number="2">2</span>
+                            <span class="appraisal-step-copy">
+                                <span class="appraisal-step-label">Performance planning</span>
+                                <span class="appraisal-step-note">Key result areas and targets</span>
+                                <span class="appraisal-step-state" data-step-state>Upcoming</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="appraisal-step-button" data-step-nav="2" aria-label="Step 3: Core competencies">
+                            <span class="appraisal-step-number" data-step-number="3">3</span>
+                            <span class="appraisal-step-copy">
+                                <span class="appraisal-step-label">Core competencies</span>
+                                <span class="appraisal-step-note">Select relevant core statements</span>
+                                <span class="appraisal-step-state" data-step-state>Upcoming</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="appraisal-step-button" data-step-nav="3" aria-label="Step 4: Non-Core competencies and comments">
+                            <span class="appraisal-step-number" data-step-number="4">4</span>
+                            <span class="appraisal-step-copy">
+                                <span class="appraisal-step-label">Non-Core competencies</span>
+                                <span class="appraisal-step-note">Select statements and add comments</span>
+                                <span class="appraisal-step-state" data-step-state>Upcoming</span>
+                            </span>
+                        </button>
+                    </li>
+                    <li>
+                        <button type="button" class="appraisal-step-button" data-step-nav="4" aria-label="Step 5: Review appraisal">
+                            <span class="appraisal-step-number" data-step-number="5">5</span>
+                            <span class="appraisal-step-copy">
+                                <span class="appraisal-step-label">Review & submit</span>
+                                <span class="appraisal-step-note">Confirm your appraisal details</span>
+                                <span class="appraisal-step-state" data-step-state>Upcoming</span>
+                            </span>
+                        </button>
+                    </li>
+                </ol>
+            </nav>
+        {% endif %}
+
+        {% if return_history %}
+            <section class="appraisal-section">
+                <h2 class="appraisal-section-heading">Return history and required corrections</h2>
+                <div class="appraisal-section-body">
+                    {% for decision in return_history %}
+                        <div class="appraisal-readonly-card">
+                            <strong>{{ decision.get_stage_display }} — {{ decision.reviewer_name }}</strong>
+                            <small class="d-block text-muted">{{ decision.created_at }}</small>
+                            <p class="mt-2 mb-0">{{ decision.comment }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endif %}
+
+        {% if read_only %}
+            {% include 'appraisal/_employee_details.html' %}
+            {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
+
+            <section class="appraisal-section">
+                <h2 class="appraisal-section-heading">SECTION 2: Performance Planning Form and Review</h2>
+                <div class="appraisal-section-body">
+                    <p class="appraisal-section-intro">Agreed key result areas, targets, resources and reviewer assessments.</p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle appraisal-table">
                             <thead>
                                 <tr>
-                                    <th>Selected statement</th>
-                                    <th>Weight</th>
-                                    <th>End-year score (1-5)</th>
-                                    <th>W × G</th>
+                                    <th>No.</th>
+                                    <th>Key result area</th>
+                                    <th>Target</th>
+                                    <th>Resources required</th>
+                                    <th>Mid-year progress / remarks</th>
+                                    <th>End-year assessment / score</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for statement in group.statements %}
+                                {% for target in targets %}
                                     <tr>
-                                        <td>{{ statement.statement }}</td>
-                                        <td>{{ group.weight|floatformat:"1" }}</td>
-                                        <td><strong>End-year score:</strong> {{ statement.score|default:"Not scored yet" }}</td>
-                                        <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
+                                        <td class="appraisal-row-number">{{ forloop.counter }}</td>
+                                        <td>{{ target.key_result_area }}</td>
+                                        <td>{{ target.target_description|default:"Not provided" }}</td>
+                                        <td>{{ target.resources_required|default:"Not provided" }}</td>
+                                        <td>{{ target.get_mid_year_progress_display|default:"Not reviewed yet" }}<br>{{ target.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                                        <td>{{ target.get_end_year_assessment_display|default:"Not reviewed yet" }}<br><strong>End-year score:</strong> {{ target.end_year_score|default:"Not scored yet" }}<br>{{ target.get_end_year_comment_display|default:"Not reviewed yet" }}</td>
                                     </tr>
                                 {% empty %}
-                                    <tr>
-                                        <td colspan="4">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot>
-                                        <tr>
-                                            <th colspan="3">Group total</th>
-                                            <td>{{ group.total|floatformat:2|default_if_none:"Pending" }}</td>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="3">Group average</th>
-                                            <td>{{ group.average|floatformat:2|default_if_none:"Pending" }}</td>
-                                        </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                    {% if group.legacy %}
-                        <div class="text-muted mb-3">
-                            {% include 'appraisal/_competency_description.html' with competency=group.competency %}
-                        </div>
-                    {% endif %}
-                    <div class="row g-2">
-                        <div class="col-md-4"><strong>Mid-year progress:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</div>
-                        <div class="col-md-4"><strong>Mid-year remark:</strong> {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</div>
-                    </div>
-                </div>
-            </div>
-            {% endwith %}
-        {% empty %}
-            <p>No competency reviews have been added to this appraisal.</p>
-        {% endfor %}
-
-
-        
-        {% include 'appraisal/_training.html' %}
-
-        <h3>Review Comments and Final Result</h3>
-        <p><strong>Supervisor:</strong> {{ appraisal.supervisor_comments|default:"No comments yet." }}</p>
-        <p><strong>HOD:</strong> {{ appraisal.hod_comments|default:"No comments yet." }}</p>
-        <p><strong>HR:</strong> {{ appraisal.hr_comments|default:"No comments yet." }}</p>
-        <p><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
-
-          <div class="card mb-4 border-primary">
-            <div class="card-header text-center">Overall Score Calculation</div>
-            <div class="card-body">
-                <p><strong>Q — Total target scores:</strong> {{ score_breakdown.target_total|floatformat:2|default_if_none:"Pending" }}</p>
-                <p><strong>A — Target average (Q ÷ number of targets):</strong> {{ score_breakdown.target_average|floatformat:2|default_if_none:"Pending" }}</p>
-                <p><strong>M — A × 0.6:</strong> {{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</p>
-                <p><strong>N — Average of core competency group averages:</strong> {{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</p>
-                <p><strong>O — Average of non-core competency group averages:</strong> {{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</p>
-                <p><strong>T — M + N + O:</strong> {{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</p>
-                <p class="mb-0"><strong>Overall percentage — T ÷ 5 × 100:</strong>
-                    {% if score_breakdown.percentage is not None %}
-                        {{ score_breakdown.percentage|floatformat:2 }}%
-                    {% else %}
-                        Pending scores
-                    {% endif %}
-                </p>
-                {% if not score_breakdown.complete %}
-                    <small class="text-muted">The final total appears once all targets and selected competency statements are scored.</small>
-                {% endif %}
-            </div>
-        </div>
-
-    {% else %}
-        <form method="POST">
-            {% csrf_token %}
-        <div class="card mb-4">
-            <div class="card-header bg-secondary text-white">Section 1: Employee Information</div>
-            <div class="card-body">
-                <p class="text-muted">Check these details and complete any missing information. Your information is saved with this appraisal.</p>
-                <div class="row">
-                    {% for field in employee_info_form %}
-                        <div class="col-md-6 mb-3">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% for error in field.errors %}<div class="text-danger">{{ error }}</div>{% endfor %}
-                        </div>
-                    {% endfor %}
-                </div>
-                {% if employee_info_form.non_field_errors %}<div class="alert alert-danger">{{ employee_info_form.non_field_errors }}</div>{% endif %}
-                <p class="mb-0"><strong>Period of report:</strong> {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"Not set" }} to {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"Not set" }} <span class="text-muted">(set by HR for this cycle)</span></p>
-            </div>
-            <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">Training Received During the Year Under Review</div>
-                <div class="card-body">
-                    <p class="text-muted">List up to four training programmes attended during this appraisal period. Leave unused rows blank.</p>
-                    {{ training_formset.management_form }}
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle">
-                            <thead><tr><th>Institution</th><th>Date</th><th>Programme</th></tr></thead>
-                            <tbody>
-                                {% for form in training_formset %}
-                                    <tr>
-                                        {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-                                        {% for field in form.visible_fields %}
-                                            <td>
-                                                {{ field }}
-                                                {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-                                            </td>
-                                        {% endfor %}
-                                    </tr>
+                                    <tr><td colspan="6" class="text-center text-muted">No targets have been added to this appraisal.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <h3>Key Result Areas (Targets)</h3>
-        <p>Please fill out your goals for the year. You can leave rows blank if you have fewer than 5 goals.</p>
-
-            {% if formset.non_form_errors %}
-                <div class="alert alert-danger">{{ formset.non_form_errors }}</div>
-            {% endif %}
-            {% if training_formset.non_form_errors %}
-                <div class="alert alert-danger">{{ training_formset.non_form_errors }}</div>
-            {% endif %}
-            <table class="table table-bordered">
-                {{ formset.management_form }}
-                {% for form in formset %}
-                    <tr>
-                        <td>
-                            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-                            {{ form.as_p }}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </table>
-
-            <div class="card mb-4">
-                <div class="card-header bg-secondary text-white">Select Competencies</div>
-                <div class="card-body">
-                    <p>{{ competency_form.competencies.help_text }}</p>
-                    {% for error in competency_form.competency_statements.errors %}
-                        <div class="text-danger">{{ error }}</div>
-                    {% endfor %}
-                    <div class="row g-3">
-                        {% for group in competency_groups %}
-                            <div class="col-12">
-                                <div class="card h-100 border">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-                                            <strong>{{ group.competency.name }}</strong>
-                                            <span class="badge bg-primary-subtle text-primary">{{ group.competency.get_competency_type_display }}</span>
-                                        </div>
-                                        <ul class="list-unstyled mb-0">
-                                            {% for statement in group.statements %}
-                                                <li class="form-check mb-2">
-                                                    <input
-                                                        class="form-check-input"
-                                                        type="checkbox"
-                                                        name="competency_statements"
-                                                        value="{{ statement.value }}"
-                                                        id="competency-statement-{{ statement.value|slugify }}"
-                                                        {% if statement.value in selected_statement_ids %}checked{% endif %}
-                                                    >
-                                                    <label class="form-check-label" for="competency-statement-{{ statement.value|slugify }}">
-                                                        {{ statement.text }}
-                                                    </label>
-                                                </li>
-                                            {% empty %}
-                                                <li class="text-muted">No statements are available for this competency.</li>
-                                            {% endfor %}
-                                        </ul>
-                                    </div>
+            <section class="appraisal-section">
+                <h2 class="appraisal-section-heading">SECTION 5: Annual Appraisal — Competencies</h2>
+                <div class="appraisal-section-body">
+                    {% for group in score_breakdown.groups %}
+                        {% with score=group.score %}
+                            <div class="appraisal-readonly-card">
+                                <div class="d-flex flex-wrap justify-content-between gap-2">
+                                    <h3>{{ score.competency.name }}</h3>
+                                    <span class="badge text-bg-light">{{ score.competency.get_competency_type_display }}</span>
                                 </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle appraisal-table">
+                                        <thead>
+                                            <tr><th>Selected statement</th><th>Weight</th><th>End-year score (1–5)</th><th>W × G</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for statement in group.statements %}
+                                                <tr>
+                                                    <td>{{ statement.statement }}</td>
+                                                    <td>{{ group.weight|floatformat:"1" }}</td>
+                                                    <td><strong>End-year score:</strong> {{ statement.score|default:"Not scored yet" }}</td>
+                                                    <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
+                                                </tr>
+                                            {% empty %}
+                                                <tr><td colspan="4">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr><th colspan="3">Group total</th><td>{{ group.total|floatformat:2|default_if_none:"Pending" }}</td></tr>
+                                            <tr><th colspan="3">Group average</th><td>{{ group.average|floatformat:2|default_if_none:"Pending" }}</td></tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                                {% if group.legacy %}
+                                    <div class="text-muted">{% include 'appraisal/_competency_description.html' with competency=group.competency %}</div>
+                                {% endif %}
+                                <p class="mb-0 mt-2"><strong>Mid-year:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }} — {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</p>
                             </div>
-                        {% empty %}
-                            <div class="col-12">
-                                <div class="alert alert-info mb-0">No competencies are available yet. Please contact HR.</div>
-                            </div>
-                        {% endfor %}
+                        {% endwith %}
+                    {% empty %}
+                        <p class="mb-0">No competency reviews have been added to this appraisal.</p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            {% include 'appraisal/_training.html' %}
+
+            <section class="appraisal-section">
+                <h2 class="appraisal-section-heading">Sections 6–10: Comments and assessment</h2>
+                <div class="appraisal-section-body">
+                    <div class="appraisal-readonly-card">
+                        <h3>Appraisee’s comments on overall assessment</h3>
+                        <p>{{ appraisal.employee_comments|default:"No comments provided." }}</p>
+                    </div>
+                    <div class="appraisal-readonly-card">
+                        <h3>Appraiser’s comments on work plan achievements</h3>
+                        <p>{{ appraisal.supervisor_comments|default:"No comments yet." }}</p>
+                    </div>
+                    <div class="appraisal-readonly-card">
+                        <h3>Career development plan</h3>
+                        <p>{{ appraisal.career_development_plan|default:"No plan recorded." }}</p>
+                    </div>
+                    <div class="appraisal-readonly-card">
+                        <h3>Assessment decision</h3>
+                        <p>{{ appraisal.get_assessment_decision_display|default:"Not determined yet" }}</p>
+                    </div>
+                    <div class="appraisal-readonly-card">
+                        <h3>Head of Department’s comments</h3>
+                        <p>{{ appraisal.hod_comments|default:"No comments yet." }}</p>
+                    </div>
+                    <div class="appraisal-readonly-card">
+                        <h3>HR comments and final result</h3>
+                        <p><strong>Comments:</strong> {{ appraisal.hr_comments|default:"No comments yet." }}</p>
+                        <p class="mb-0"><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <button type="submit" class="btn btn-primary">Save Goals and Competencies</button>
-            <button
-                type="submit"
-                name="action"
-                value="submit"
-                class="btn btn-success"
-                onclick="return confirm('Submit this appraisal to your supervisor? You will not be able to edit it afterward.')"
-            >
-                {% if appraisal.status == 'returned_employee' %}Save Corrections and Resubmit{% else %}Save and Submit to Supervisor{% endif %}
-            </button>
-        </form>
-    {% endif %}
+            <section class="appraisal-section">
+                <h2 class="appraisal-section-heading">Overall Score Calculation</h2>
+                <div class="appraisal-section-body appraisal-results-lines">
+                    <p><strong>Q — Total target scores:</strong><span>=</span><span>{{ score_breakdown.target_total|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p><strong>A — Target average (Q ÷ number of targets):</strong><span>=</span><span>{{ score_breakdown.target_average|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p><strong>M — A × 0.6:</strong><span>=</span><span>{{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p><strong>N — Average of core competency group averages:</strong><span>=</span><span>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p><strong>O — Average of non-core competency group averages:</strong><span>=</span><span>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p><strong>T — M + N + O:</strong><span>=</span><span>{{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</span></p>
+                    <p class="mb-0"><strong>Overall percentage — T ÷ 5 × 100:</strong><span>=</span><span>{% if score_breakdown.percentage is not None %}{{ score_breakdown.percentage|floatformat:2 }}%{% else %}Pending scores{% endif %}</span></p>
+                    {% if not score_breakdown.complete %}
+                        <small class="text-muted d-block mt-3">The final total appears once all targets and selected competency statements are scored.</small>
+                    {% endif %}
+                </div>
+            </section>
+        {% else %}
+            <form method="post" action="{{ cycle_fill_url }}" id="employee-appraisal-form">
+                {% csrf_token %}
 
-    <a href="{% url 'employee_dashboard' %}" class="btn btn-secondary mt-3">Back to Dashboard</a>
-</div>
+                <section class="appraisal-step-panel{% if current_step == 0 %} is-active{% endif %}" data-step-panel="0" aria-labelledby="employee-information-heading">
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading" id="employee-information-heading">SECTION 1 - A: Appraisee’s Personal Information</h2>
+                        <div class="appraisal-period">
+                            <span class="appraisal-period-label">PERIOD OF REPORT</span>
+                            <strong>From:</strong> {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"Not set" }}
+                            <strong>To:</strong> {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"Not set" }}
+                            <span class="text-muted">(set by HR for this cycle)</span>
+                        </div>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-section-intro">Check your details and complete any missing information. Your information is saved with this appraisal.</p>
+                            <div class="appraisal-fields-grid">
+                                {% for field in employee_info_form %}
+                                    {% if field.name != 'employee_comments' %}
+                                        <div class="appraisal-field">
+                                            {{ field.label_tag }}
+                                            {{ field }}
+                                            {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% if employee_info_form.non_field_errors %}
+                                <div class="alert alert-danger mt-3">{{ employee_info_form.non_field_errors }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading">Training received during the year under review</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-help">List up to four training programmes attended during this appraisal period. Leave unused rows blank.</p>
+                            {% if training_formset.non_form_errors %}<div class="alert alert-danger">{{ training_formset.non_form_errors }}</div>{% endif %}
+                            {{ training_formset.management_form }}
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle appraisal-table">
+                                    <thead><tr><th>Institution</th><th>Date (dd-mm-yyyy)</th><th>Programme</th></tr></thead>
+                                    <tbody>
+                                        {% for form in training_formset %}
+                                            <tr>
+                                                {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                {% for field in form.visible_fields %}
+                                                    <td>
+                                                        {{ field }}
+                                                        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                                    </td>
+                                                {% endfor %}
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
+                    <div class="appraisal-navigation no-print">
+                        <span class="text-muted small">Step 1 of 5</span>
+                        <button type="submit" name="action" value="save_personal" class="btn appraisal-button-primary">Save and continue</button>
+                    </div>
+                </section>
+
+                <section class="appraisal-step-panel{% if current_step == 1 %} is-active{% endif %}" data-step-panel="1" aria-labelledby="performance-planning-heading">
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading" id="performance-planning-heading">SECTION 2: Performance Planning Form</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-section-intro">Agree your key result areas, targets and resources with your appraiser. Use up to five goals; at least one complete key result area and target is required before submission.</p>
+                            {% if formset.non_form_errors %}<div class="alert alert-danger">{{ formset.non_form_errors }}</div>{% endif %}
+                            {{ formset.management_form }}
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle appraisal-table">
+                                    <thead>
+                                        <tr>
+                                            <th>No.</th>
+                                            <th>Key result areas<br><small>(drawn from your job description)</small></th>
+                                            <th>Targets<br><small>(specific, measurable, realistic and time-framed)</small></th>
+                                            <th>Resources required</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for form in formset %}
+                                            <tr>
+                                                <td class="appraisal-row-number">
+                                                    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                    {{ forloop.counter }}
+                                                </td>
+                                                <td>
+                                                    {{ form.key_result_area }}
+                                                    {% for error in form.key_result_area.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                                </td>
+                                                <td>
+                                                    {{ form.target_description }}
+                                                    {% for error in form.target_description.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                                </td>
+                                                <td>
+                                                    {{ form.resources_required }}
+                                                    {% for error in form.resources_required.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="appraisal-navigation no-print">
+                        <button type="button" class="btn appraisal-button-outline" data-step-nav="0">Previous section</button>
+                        <div class="appraisal-navigation-group">
+                            <span class="align-self-center text-muted small">Step 2 of 5</span>
+                            <button type="submit" name="action" value="save_targets" class="btn appraisal-button-primary">Save and continue</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="appraisal-step-panel{% if current_step == 2 %} is-active{% endif %}" data-step-panel="2" aria-labelledby="core-competencies-heading">
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading" id="core-competencies-heading">SECTION 5: Annual Appraisal — Core Competencies</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-section-intro">Select the core competency statements relevant to your role. You can select non-core competencies on the next step.</p>
+                            {% for error in competency_form.competency_statements.errors %}
+                                <div class="alert alert-danger">{{ error }}</div>
+                            {% endfor %}
+                            {% include 'appraisal/_employee_competency_category.html' with title="Core Competencies" category_groups=core_competency_groups selected_statement_ids=selected_statement_ids %}
+                        </div>
+                    </div>
+
+                    <div class="appraisal-navigation no-print">
+                        <button type="button" class="btn appraisal-button-outline" data-step-nav="1">Previous section</button>
+                        <div class="appraisal-navigation-group">
+                            <span class="align-self-center text-muted small">Step 3 of 5</span>
+                            <button type="submit" name="action" value="save_core_competencies" class="btn appraisal-button-primary">Save and continue</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="appraisal-step-panel{% if current_step == 3 %} is-active{% endif %}" data-step-panel="3" aria-labelledby="non-core-competencies-heading">
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading" id="non-core-competencies-heading">SECTION 5: Annual Appraisal — Non-Core Competencies</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-section-intro">Select non-core competency statements relevant to your role. At least one core or non-core statement is required before submission.</p>
+                            {% for error in competency_form.competency_statements.errors %}
+                                <div class="alert alert-danger">{{ error }}</div>
+                            {% endfor %}
+                            {% include 'appraisal/_employee_competency_category.html' with title="Non-Core Competencies" category_groups=non_core_competency_groups selected_statement_ids=selected_statement_ids %}
+                        </div>
+                    </div>
+
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading">SECTION 9: Appraisee’s Comments on Overall Assessment</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-help">Add your comments about your overall performance before submitting for review.</p>
+                            <div class="appraisal-field">
+                                {{ employee_info_form.employee_comments.label_tag }}
+                                {{ employee_info_form.employee_comments }}
+                                {% for error in employee_info_form.employee_comments.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="appraisal-navigation no-print">
+                        <button type="button" class="btn appraisal-button-outline" data-step-nav="2">Previous section</button>
+                        <div class="appraisal-navigation-group">
+                            <span class="align-self-center text-muted small">Step 4 of 5</span>
+                            <button type="submit" name="action" value="save_competencies" class="btn appraisal-button-primary">Save and review</button>
+                            <button type="button" class="btn appraisal-button-outline" data-step-nav="4">Review appraisal</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="appraisal-step-panel{% if current_step == 4 %} is-active{% endif %}" data-step-panel="4" aria-labelledby="submission-preview-heading">
+                    <div class="appraisal-section">
+                        <h2 class="appraisal-section-heading" id="submission-preview-heading">Review your appraisal before submitting</h2>
+                        <div class="appraisal-section-body">
+                            <p class="appraisal-section-intro">Check each section against the information you entered. Use the previous section button or step navigation to make changes.</p>
+                        </div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">SECTION 1: Employee Information</h3>
+                        <div class="appraisal-section-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle appraisal-table">
+                                    <tbody data-preview-employee-info>
+                                        <tr><th>Name</th><td data-preview-name>—</td></tr>
+                                        <tr><th>Staff ID</th><td>{{ request.user.username }}</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">Training received during the year under review</h3>
+                        <div class="appraisal-section-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle appraisal-table">
+                                    <thead><tr><th>Institution</th><th>Date</th><th>Programme</th></tr></thead>
+                                    <tbody data-preview-training><tr><td colspan="3" class="text-muted">No training entered.</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">SECTION 2: Performance Planning Form</h3>
+                        <div class="appraisal-section-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle appraisal-table">
+                                    <thead><tr><th>Key result area</th><th>Target</th><th>Resources required</th></tr></thead>
+                                    <tbody data-preview-targets><tr><td colspan="3" class="text-muted">No targets added yet.</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">SECTION 5: Annual Appraisal — Core Competencies</h3>
+                        <div class="appraisal-section-body" data-preview-core><p class="text-muted">No core competency statements selected.</p></div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">SECTION 5: Annual Appraisal — Non-Core Competencies</h3>
+                        <div class="appraisal-section-body" data-preview-non-core><p class="text-muted">No non-core competency statements selected.</p></div>
+                    </div>
+                    <div class="appraisal-section">
+                        <h3 class="appraisal-section-heading">SECTION 9: Appraisee’s Comments on Overall Assessment</h3>
+                        <div class="appraisal-section-body">
+                            <p data-preview-comments class="mb-0">No comments entered yet.</p>
+                        </div>
+                    </div>
+                    <div class="appraisal-navigation no-print">
+                        <button type="button" class="btn appraisal-button-outline" data-step-nav="3">Previous section</button>
+                        <div class="appraisal-navigation-group">
+                            <span class="align-self-center text-muted small">Step 5 of 5</span>
+                            <button type="button" class="btn btn-success" data-open-submit-confirmation>
+                                {% if appraisal.status == 'returned_employee' %}Review and resubmit{% else %}Submit for supervisor review{% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <dialog class="appraisal-confirmation" aria-labelledby="submit-confirmation-title">
+                    <h2 id="submit-confirmation-title">Submit this appraisal?</h2>
+                    <p>Your appraisal will be sent to your supervisor and you will no longer be able to edit it unless it is returned to you.</p>
+                    <div class="d-flex flex-wrap justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-close-submit-confirmation>Keep editing</button>
+                        <button type="submit" name="action" value="submit" class="btn btn-success">Confirm submission</button>
+                    </div>
+                </dialog>
+            </form>
+        {% endif %}
+    </article>
+</main>
+
+<script>
+    (function () {
+        const page = document.querySelector('.appraisal-form-page');
+        const panels = Array.from(document.querySelectorAll('[data-step-panel]'));
+        const stepButtons = Array.from(document.querySelectorAll('[data-step-nav]'));
+        const progress = document.querySelector('[data-step-progress]');
+        const progressTrack = document.querySelector('[data-step-track]');
+        const progressPercent = document.querySelector('[data-step-percent]');
+        const stepCount = document.querySelector('[data-step-count]');
+        const appraisalForm = document.querySelector('#employee-appraisal-form');
+        if (!page || panels.length === 0) return;
+
+        document.documentElement.classList.add('appraisal-js');
+        let currentStep = Number('{{ current_step|default:0 }}');
+        if (!Number.isInteger(currentStep) || currentStep < 0 || currentStep >= panels.length) currentStep = 0;
+
+        function showStep(step) {
+            currentStep = Math.max(0, Math.min(step, panels.length - 1));
+            panels.forEach(function (panel, index) {
+                const active = index === currentStep;
+                panel.classList.toggle('is-active', active);
+                panel.setAttribute('aria-hidden', active ? 'false' : 'true');
+            });
+            stepButtons.forEach(function (button) {
+                const stepIndex = Number(button.dataset.stepNav);
+                if (button.classList.contains('appraisal-step-button')) {
+                    const complete = stepIndex < currentStep;
+                    const current = stepIndex === currentStep;
+                    button.classList.toggle('is-current', current);
+                    button.classList.toggle('is-complete', complete);
+                    button.parentElement.classList.toggle('is-complete', complete);
+                    if (current) {
+                        button.setAttribute('aria-current', 'step');
+                    } else {
+                        button.removeAttribute('aria-current');
+                    }
+                    const number = button.querySelector('[data-step-number]');
+                    const state = button.querySelector('[data-step-state]');
+                    if (number) number.textContent = complete ? '✓' : String(stepIndex + 1);
+                    if (state) state.textContent = complete ? 'Completed' : (current ? 'In progress' : 'Upcoming');
+                }
+            });
+            const percent = Math.round(currentStep / (panels.length - 1) * 100);
+            if (progress) progress.style.width = percent + '%';
+            if (progressTrack) progressTrack.setAttribute('aria-valuenow', String(percent));
+            if (progressPercent) progressPercent.textContent = percent + '%';
+            if (stepCount) stepCount.textContent = String(currentStep + 1);
+        }
+
+        stepButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                showStep(Number(button.dataset.stepNav));
+            });
+        });
+        showStep(currentStep);
+
+        function fieldValue(name) {
+            const field = appraisalForm.querySelector('[name="' + name + '"]');
+            if (!field) return '';
+            if (field.tagName === 'SELECT') {
+                return field.selectedOptions.length ? field.selectedOptions[0].textContent.trim() : '';
+            }
+            return field.value.trim();
+        }
+
+        function previewText(element, value, fallback) {
+            if (element) element.textContent = value || fallback;
+        }
+
+        function updateSubmissionPreview() {
+            if (!appraisalForm) return;
+            const title = fieldValue('employee_info-employee_title');
+            const otherTitle = fieldValue('employee_info-employee_other_title');
+            const name = [
+                title === 'Other' ? otherTitle : title,
+                fieldValue('employee_info-employee_first_name'),
+                fieldValue('employee_info-employee_other_names'),
+                fieldValue('employee_info-employee_last_name'),
+            ].filter(Boolean).join(' ');
+            previewText(appraisalForm.querySelector('[data-preview-name]'), name, 'Name not provided');
+            const employeeInfoPreview = appraisalForm.querySelector('[data-preview-employee-info]');
+            if (employeeInfoPreview) {
+                Array.from(employeeInfoPreview.querySelectorAll('[data-preview-generated]')).forEach(function (row) {
+                    row.remove();
+                });
+                const nameFields = [
+                    'employee_info-employee_title',
+                    'employee_info-employee_other_title',
+                    'employee_info-employee_first_name',
+                    'employee_info-employee_other_names',
+                    'employee_info-employee_last_name',
+                ];
+                Array.from(appraisalForm.querySelectorAll('[name^="employee_info-"]'))
+                    .filter(function (field) {
+                        return field.type !== 'hidden'
+                            && field.name !== 'employee_info-employee_comments'
+                            && nameFields.indexOf(field.name) === -1
+                            && (!['checkbox', 'radio'].includes(field.type) || field.checked);
+                    })
+                    .forEach(function (field) {
+                        const label = appraisalForm.querySelector('label[for="' + field.id + '"]');
+                        const value = field.tagName === 'SELECT' && field.selectedOptions.length
+                            ? field.selectedOptions[0].textContent.trim()
+                            : (field.type === 'checkbox' ? 'Yes' : field.value.trim());
+                        const row = document.createElement('tr');
+                        row.dataset.previewGenerated = 'true';
+                        const heading = document.createElement('th');
+                        heading.textContent = label ? label.textContent.trim() : field.name;
+                        const cell = document.createElement('td');
+                        cell.textContent = value || 'Not provided';
+                        row.append(heading, cell);
+                        employeeInfoPreview.append(row);
+                    });
+            }
+            previewText(
+                appraisalForm.querySelector('[data-preview-comments]'),
+                fieldValue('employee_info-employee_comments'),
+                'No comments entered yet.',
+            );
+
+            const targetsPreview = appraisalForm.querySelector('[data-preview-targets]');
+            if (targetsPreview) {
+                targetsPreview.replaceChildren();
+                const rows = Array.from(appraisalForm.querySelectorAll('[name$="-key_result_area"]'))
+                    .map(function (field) {
+                        const row = field.closest('tr');
+                        return {
+                            area: field.value.trim(),
+                            target: row && row.querySelector('[name$="-target_description"]')
+                                ? row.querySelector('[name$="-target_description"]').value.trim()
+                                : '',
+                            resources: row && row.querySelector('[name$="-resources_required"]')
+                                ? row.querySelector('[name$="-resources_required"]').value.trim()
+                                : '',
+                        };
+                    })
+                    .filter(function (target) { return target.area || target.target || target.resources; });
+                if (!rows.length) {
+                    const empty = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 3;
+                    cell.className = 'text-muted';
+                    cell.textContent = 'No targets added yet.';
+                    empty.append(cell);
+                    targetsPreview.append(empty);
+                } else {
+                    rows.forEach(function (target) {
+                        const row = document.createElement('tr');
+                        [target.area, target.target, target.resources].forEach(function (value) {
+                            const cell = document.createElement('td');
+                            cell.textContent = value || '—';
+                            row.append(cell);
+                        });
+                        targetsPreview.append(row);
+                    });
+                }
+            }
+
+            const trainingPreview = appraisalForm.querySelector('[data-preview-training]');
+            if (trainingPreview) {
+                trainingPreview.replaceChildren();
+                const trainingTableBody = appraisalForm.querySelector('[data-step-panel="0"] tbody');
+                const trainingRows = trainingTableBody ? Array.from(trainingTableBody.rows)
+                    .map(function (row) {
+                        return Array.from(row.querySelectorAll('input:not([type="hidden"]), select, textarea'))
+                            .filter(function (field) { return field.name && !field.name.endsWith('-DELETE'); })
+                            .map(function (field) {
+                                return field.tagName === 'SELECT' && field.selectedOptions.length
+                                    ? field.selectedOptions[0].textContent.trim()
+                                    : field.value.trim();
+                            });
+                    })
+                    .filter(function (values) { return values.some(Boolean); }) : [];
+                if (!trainingRows.length) {
+                    const row = document.createElement('tr');
+                    const cell = document.createElement('td');
+                    cell.colSpan = 3;
+                    cell.className = 'text-muted';
+                    cell.textContent = 'No training entered.';
+                    row.append(cell);
+                    trainingPreview.append(row);
+                } else {
+                    trainingRows.forEach(function (values) {
+                        const row = document.createElement('tr');
+                        values.slice(0, 3).forEach(function (value) {
+                            const cell = document.createElement('td');
+                            cell.textContent = value || '—';
+                            row.append(cell);
+                        });
+                        trainingPreview.append(row);
+                    });
+                }
+            }
+
+            ['core', 'non-core'].forEach(function (category, index) {
+                const preview = appraisalForm.querySelector(
+                    category === 'core' ? '[data-preview-core]' : '[data-preview-non-core]'
+                );
+                const panel = appraisalForm.querySelector('[data-step-panel="' + (index + 2) + '"]');
+                if (!preview || !panel) return;
+                preview.replaceChildren();
+                const selected = Array.from(panel.querySelectorAll('input[name="competency_statements"]:checked'))
+                    .map(function (checkbox) {
+                        const label = appraisalForm.querySelector('label[for="' + checkbox.id + '"]');
+                        return label ? label.textContent.trim() : '';
+                    })
+                    .filter(Boolean);
+                if (!selected.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'text-muted mb-0';
+                    empty.textContent = 'No ' + category + ' competency statements selected.';
+                    preview.append(empty);
+                } else {
+                    const list = document.createElement('ul');
+                    selected.forEach(function (statement) {
+                        const item = document.createElement('li');
+                        item.textContent = statement;
+                        list.append(item);
+                    });
+                    preview.append(list);
+                }
+            });
+        }
+
+        if (appraisalForm) {
+            appraisalForm.addEventListener('input', updateSubmissionPreview);
+            appraisalForm.addEventListener('change', updateSubmissionPreview);
+            updateSubmissionPreview();
+        }
+
+        const dialog = document.querySelector('.appraisal-confirmation');
+        const openConfirmation = document.querySelector('[data-open-submit-confirmation]');
+        const closeConfirmation = document.querySelector('[data-close-submit-confirmation]');
+        if (dialog && openConfirmation && typeof dialog.showModal === 'function') {
+            openConfirmation.addEventListener('click', function () {
+                dialog.showModal();
+            });
+            closeConfirmation.addEventListener('click', function () {
+                dialog.close();
+            });
+            dialog.addEventListener('click', function (event) {
+                if (event.target === dialog) dialog.close();
+            });
+        } else if (openConfirmation) {
+            openConfirmation.type = 'submit';
+            openConfirmation.name = 'action';
+            openConfirmation.value = 'submit';
+        }
+    })();
+</script>
 {% endblock %}

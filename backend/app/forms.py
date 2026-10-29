@@ -1,6 +1,8 @@
 # yourapp/forms.py
 from django import forms
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
 from .models import (
     Appraisal,
     AppraisalTraining,
@@ -10,7 +12,44 @@ from .models import (
     Competency,
     Department,
     EmployeeProfile,
+    AppraisalCycle
 )
+
+class AppraisalCycleForm(forms.ModelForm):
+    class Meta:
+        model = AppraisalCycle
+        fields = ['year', 'report_period_from', 'report_period_to', 'is_active']
+        widgets = {
+            'year': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. 2026',
+                'inputmode': 'numeric',
+            }),
+            'report_period_from': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'report_period_to': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+            }),
+            'is_active': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+            }),
+        }
+        labels = {
+            'year': 'Appraisal cycle year',
+            'report_period_from': 'Report period starts',
+            'report_period_to': 'Report period ends',
+            'is_active': 'Make this cycle active',
+        }
+        help_texts = {
+            'year': 'Use a unique year for this appraisal cycle.',
+            'report_period_from': 'Optional start date shown on appraisal forms.',
+            'report_period_to': 'Optional end date shown on appraisal forms.',
+            'is_active': 'Employees and reviewers can work on active cycles.',
+        }
+
 
 
 class UserProfileForm(forms.ModelForm):
@@ -97,6 +136,7 @@ class AppraisalEmployeeInfoForm(forms.ModelForm):
             'employee_job_title',
             'employee_department',
             'employee_appointment_to_present_grade_date',
+            'employee_comments',
         ]
         labels = {
             'employee_title': 'Title',
@@ -109,11 +149,13 @@ class AppraisalEmployeeInfoForm(forms.ModelForm):
             'employee_department': 'Department / unit',
             'employee_appointment_to_present_grade_date':
                 'Date of appointment to present grade',
+            'employee_comments': "Appraisee's comments on overall assessment",
         }
         widgets = {
             'employee_appointment_to_present_grade_date': forms.DateInput(
                 attrs={'type': 'date'},
             ),
+            'employee_comments': forms.Textarea(attrs={'rows': 5}),
         }
 
     def __init__(self, *args, profile=None, **kwargs):
@@ -146,6 +188,10 @@ class AppraisalEmployeeInfoForm(forms.ModelForm):
         for field_name in self.fields:
             field = self.fields[field_name]
             instance_value = getattr(self.instance, field_name)
+            if field_name == 'employee_comments':
+                if instance_value:
+                    self.initial[field_name] = instance_value
+                continue
             if field_name == 'employee_department':
                 has_appraisal_value = bool(
                     self.instance.employee_department_id
@@ -245,11 +291,28 @@ class TargetForm(forms.ModelForm):
             'resources_required': forms.Textarea(attrs={'rows': 2}),
         }
 
+class EmployeeTargetFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if self.data.get('action') != 'submit' or any(self.errors):
+            return
+
+        if not any(
+            form.cleaned_data.get('key_result_area')
+            and form.cleaned_data.get('target_description')
+            for form in self.forms
+        ):
+            raise ValidationError(
+                'Add at least one key result area and its target before submitting.'
+            )
+
+
 # We use Django's FormSet to allow the employee to add multiple targets at once
 TargetFormSet = forms.inlineformset_factory(
     Appraisal, 
     AppraisalTarget, 
     form=TargetForm, 
+    formset=EmployeeTargetFormSet,
     extra=5, 
     max_num=5, 
     can_delete=False
@@ -307,6 +370,33 @@ class SupervisorTargetForm(forms.ModelForm):
             'end_year_score': forms.NumberInput(attrs={'min': 1, 'max': 5}),
         }
 
+
+class AppraiserReviewForm(forms.ModelForm):
+    class Meta:
+        model = Appraisal
+        fields = [
+            'supervisor_comments',
+            'career_development_plan',
+            'assessment_decision',
+        ]
+        labels = {
+            'supervisor_comments': "Appraiser's comments on work plan achievements",
+            'career_development_plan': 'Training and development - comments and plan',
+            'assessment_decision': "Assessment of appraisee's potential",
+        }
+        widgets = {
+            'supervisor_comments': forms.Textarea(attrs={'rows': 8}),
+            'career_development_plan': forms.Textarea(attrs={'rows': 6}),
+            'assessment_decision': forms.RadioSelect,
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['supervisor_comments'].required = False
+        self.fields['career_development_plan'].required = False
+        self.fields['assessment_decision'].required = False
+
+
 class SupervisorCompetencyForm(forms.ModelForm):
     class Meta:
         model = AppraisalCompetencyScore
@@ -337,6 +427,10 @@ class HODCommentForm(forms.ModelForm):
         widgets = {
             'hod_comments': forms.Textarea(attrs={'rows': 4, 'placeholder': 'Enter your HOD comments here...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['hod_comments'].required = True
 
 class HRCommentForm(forms.ModelForm):
     class Meta:

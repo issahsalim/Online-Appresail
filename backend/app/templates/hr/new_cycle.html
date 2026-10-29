@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Appraisal Cycles | Staff Appraisal System{% endblock %}
+
+{% block content %}
+<div class="hr-cycle-shell">
+    <style>
+        body:has(.hr-cycle-shell) > .container { max-width: none; padding: 0; width: 100%; }
+        .hr-cycle-shell { background: #f2f5f7; display: flex; min-height: calc(100vh - 64px); }
+        .hr-cycle-sidebar {
+            align-self: flex-start;
+            background: #142d3c;
+            color: #fff;
+            flex: 0 0 248px;
+            min-height: calc(100vh - 64px);
+            padding: 1.5rem 1rem;
+            position: sticky;
+            top: 0;
+        }
+        .hr-cycle-brand {
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,.12);
+            color: #fff;
+            display: flex;
+            font-size: .98rem;
+            font-weight: 750;
+            gap: .7rem;
+            line-height: 1.25;
+            margin: 0 .45rem 1.5rem;
+            padding: .25rem 0 1.25rem;
+            text-decoration: none;
+        }
+        .hr-cycle-mark { align-items: center; background: #20c3b1; border-radius: 11px; color: #103448; display: inline-flex; flex: 0 0 38px; height: 38px; justify-content: center; }
+        .hr-cycle-nav-label { color: #8fa5b1; font-size: .68rem; font-weight: 750; letter-spacing: .12em; margin: 1.2rem .7rem .55rem; text-transform: uppercase; }
+        .hr-cycle-nav { display: grid; gap: .55rem; }
+        .hr-cycle-link {
+            align-items: center;
+            background: transparent;
+            border-radius: 13px;
+            color: #c4d2d9;
+            display: flex;
+            font-size: .9rem;
+            font-weight: 600;
+            gap: .8rem;
+            min-height: 58px;
+            padding: .65rem .75rem;
+            text-decoration: none;
+            transition: background .18s ease, color .18s ease;
+        }
+        .hr-cycle-link:hover, .hr-cycle-link.active { background: #214457; color: #fff; }
+        .hr-cycle-link.active { box-shadow: inset 3px 0 #27c8b5; }
+        .hr-cycle-icon { align-items: center; background: rgba(99,221,207,.1); border: 1px solid rgba(99,221,207,.12); border-radius: 10px; color: #63ddcf; display: inline-flex; flex: 0 0 36px; height: 36px; justify-content: center; }
+        .hr-cycle-link-copy { display: grid; gap: .14rem; }
+        .hr-cycle-link-title { font-size: .86rem; font-weight: 700; }
+        .hr-cycle-link-note { color: #91a9b5; font-size: .68rem; }
+        .hr-cycle-content { flex: 1; min-width: 0; padding: clamp(1.25rem, 3vw, 2.5rem); }
+        .hr-cycle-header { align-items: center; display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; margin: 0 auto 1.5rem; max-width: 1100px; }
+        .hr-cycle-eyebrow { color: #66808b; font-size: .72rem; font-weight: 750; letter-spacing: .13em; margin-bottom: .45rem; text-transform: uppercase; }
+        .hr-cycle-header h1 { color: #092b46; font-size: clamp(1.65rem, 3vw, 2.15rem); font-weight: 780; letter-spacing: -.035em; margin: 0 0 .35rem; }
+        .hr-cycle-header p { color: #71818b; margin: 0; }
+        .hr-cycle-back { background: #fff; border: 1px solid #dce5e9; border-radius: 10px; color: #23495b; font-size: .85rem; font-weight: 700; padding: .68rem .9rem; text-decoration: none; }
+        .hr-cycle-back:hover { background: #edf2f5; color: #173747; }
+        .hr-cycle-layout { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); margin: 0 auto; max-width: 1100px; }
+        .hr-cycle-card { background: #fff; border: 1px solid #e1e9ed; border-radius: 18px; box-shadow: 0 12px 30px rgba(20,45,60,.045); overflow: hidden; }
+        .hr-cycle-card-header { background: #f7f9fa; border-bottom: 1px solid #e5edef; padding: 1.15rem 1.35rem; }
+        .hr-cycle-card-header h2 { color: #173747; font-size: 1rem; font-weight: 750; margin: 0 0 .3rem; }
+        .hr-cycle-card-header p { color: #72828b; font-size: .82rem; margin: 0; }
+        .hr-cycle-card-body { padding: clamp(1.1rem, 2.5vw, 1.5rem); }
+        .hr-cycle-form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .hr-cycle-field { min-width: 0; }
+        .hr-cycle-field--wide { grid-column: 1 / -1; }
+        .hr-cycle-field label { color: #365461; display: block; font-size: .81rem; font-weight: 700; margin-bottom: .35rem; }
+        .hr-cycle-field .form-control { border-color: #d5e1e4; border-radius: 10px; color: #173747; min-height: 45px; }
+        .hr-cycle-field .form-control:focus { border-color: #547181; box-shadow: 0 0 0 .2rem rgba(23,63,80,.1); }
+        .hr-cycle-help { color: #788a92; display: block; font-size: .74rem; margin-top: .35rem; }
+        .hr-cycle-error { color: #a13d2a; font-size: .78rem; margin-top: .35rem; }
+        .hr-cycle-nonfield-errors { background: #fff3ef; border: 1px solid #f2c7bd; border-radius: 10px; color: #8a3f30; margin-bottom: 1rem; padding: .8rem 1rem; }
+        .hr-cycle-checkbox { align-items: flex-start; background: #f7f9fa; border: 1px solid #e3eaed; border-radius: 12px; display: flex; gap: .7rem; padding: .85rem; }
+        .hr-cycle-checkbox .form-check-input { flex: 0 0 auto; margin: .2rem 0 0; }
+        .hr-cycle-checkbox label { margin: 0; }
+        .hr-cycle-submit { background: #173f50; border: 1px solid #173f50; border-radius: 9px; color: #fff; font-size: .88rem; font-weight: 750; min-height: 45px; padding: .65rem 1rem; }
+        .hr-cycle-submit:hover { background: #20596a; border-color: #20596a; }
+        .hr-cycle-table-wrap { overflow-x: auto; }
+        .hr-cycle-table { margin: 0; min-width: 650px; }
+        .hr-cycle-table th { background: #f7f9fa; border-bottom: 1px solid #e5ecef; color: #496370; font-size: .71rem; font-weight: 750; letter-spacing: .04em; padding: .75rem 1rem; text-transform: uppercase; white-space: nowrap; }
+        .hr-cycle-table td { border-bottom: 1px solid #edf2f5; color: #2c4a57; font-size: .83rem; padding: .8rem 1rem; vertical-align: middle; }
+        .hr-cycle-table tr:last-child td { border-bottom: 0; }
+        .hr-cycle-badge { background: #e8f6f3; border: 1px solid #ccebe4; border-radius: 999px; color: #167968; display: inline-flex; font-size: .69rem; font-weight: 750; padding: .25rem .55rem; }
+        .hr-cycle-badge.is-inactive { background: #f0f3f5; border-color: #e0e6e9; color: #657982; }
+        .hr-cycle-actions { align-items: center; display: flex; flex-wrap: wrap; gap: .4rem; }
+        .hr-cycle-action-form { display: inline-flex; margin: 0; }
+        .hr-cycle-action { border: 1px solid transparent; border-radius: 8px; cursor: pointer; font-size: .75rem; font-weight: 700; min-height: 34px; padding: .38rem .62rem; white-space: nowrap; }
+        .hr-cycle-action--toggle { background: #edf2f5; border-color: #d7e0e5; color: #23495b; }
+        .hr-cycle-action--toggle:hover { background: #e1e9ed; }
+        .hr-cycle-action--delete { background: #fff3ef; border-color: #f0d0c8; color: #93422e; }
+        .hr-cycle-action--delete:hover:not(:disabled) { background: #fbe4dd; }
+        .hr-cycle-action:disabled { cursor: not-allowed; opacity: .58; }
+        .hr-cycle-record-note { color: #788a92; display: block; font-size: .68rem; margin-top: .3rem; max-width: 190px; }
+        .hr-cycle-empty { color: #72828b; padding: 1.6rem 1rem !important; text-align: center; }
+        @media (max-width: 900px) { .hr-cycle-layout { grid-template-columns: 1fr; } }
+        @media (max-width: 767.98px) {
+            .hr-cycle-shell { display: block; }
+            .hr-cycle-sidebar { min-height: 0; padding: .8rem 1rem; position: static; }
+            .hr-cycle-brand { margin: 0; padding: 0 0 .8rem; }
+            .hr-cycle-nav-label { margin-top: .8rem; }
+            .hr-cycle-nav { gap: .45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .hr-cycle-link { gap: .5rem; min-height: 52px; min-width: 0; padding: .5rem; }
+            .hr-cycle-link-title { font-size: .76rem; }
+            .hr-cycle-link-note { display: none; }
+            .hr-cycle-icon { flex-basis: 32px; height: 32px; }
+            .hr-cycle-content { padding: 1rem; }
+            .hr-cycle-header { align-items: flex-start; flex-direction: column; }
+        }
+        @media (max-width: 520px) { .hr-cycle-form-grid { grid-template-columns: 1fr; } .hr-cycle-field--wide { grid-column: auto; } }
+        @media (prefers-reduced-motion: reduce) { .hr-cycle-shell *, .hr-cycle-shell *::before, .hr-cycle-shell *::after { transition-duration: .01ms !important; } }
+    </style>
+
+    <aside class="hr-cycle-sidebar" aria-label="HR workspace navigation">
+        <a class="hr-cycle-brand" href="{% url 'hr_dashboard' %}">
+            <span class="hr-cycle-mark" aria-hidden="true">✚</span>
+            <span>Mathias Catholic Hospital<br><small class="fw-normal opacity-75">HR WORKSPACE</small></span>
+        </a>
+        <div class="hr-cycle-nav-label">Workspace</div>
+        <nav class="hr-cycle-nav">
+            <a class="hr-cycle-link" href="{% url 'hr_dashboard' %}">
+                <span class="hr-cycle-icon" aria-hidden="true">▦</span>
+                <span class="hr-cycle-link-copy"><span class="hr-cycle-link-title">HR dashboard</span><span class="hr-cycle-link-note">Overview and reviews</span></span>
+            </a>
+            <a class="hr-cycle-link active" href="{% url 'new_app_cycle' %}" aria-current="page">
+                <span class="hr-cycle-icon" aria-hidden="true">＋</span>
+                <span class="hr-cycle-link-copy"><span class="hr-cycle-link-title">Appraisal cycles</span><span class="hr-cycle-link-note">Create and manage cycles</span></span>
+            </a>
+        </nav>
+        <div class="hr-cycle-nav-label">Signed in</div>
+        <div class="small px-2 text-white-50">{{ request.user.username }}</div>
+    </aside>
+
+    <main class="hr-cycle-content">
+        <header class="hr-cycle-header">
+            <div>
+                <div class="hr-cycle-eyebrow">Cycle management</div>
+                <h1>Appraisal cycles</h1>
+                <p>Create a cycle and set the report period shown on appraisal forms.</p>
+            </div>
+            <a href="{% url 'hr_dashboard' %}" class="hr-cycle-back">← Back to HR dashboard</a>
+        </header>
+
+        <div class="hr-cycle-layout">
+            <section class="hr-cycle-card" aria-labelledby="create-cycle-heading">
+                <div class="hr-cycle-card-header">
+                    <h2 id="create-cycle-heading">Create a new cycle</h2>
+                    <p>Cycle year must be unique. Dates are optional, but the end date cannot be before the start date.</p>
+                </div>
+                <div class="hr-cycle-card-body">
+                    <form method="post" action="{% url 'new_app_cycle' %}">
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="hr-cycle-nonfield-errors" role="alert">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <div class="hr-cycle-form-grid">
+                            <div class="hr-cycle-field hr-cycle-field--wide">
+                                {{ form.year.label_tag }}
+                                {{ form.year }}
+                                {% if form.year.help_text %}<span class="hr-cycle-help">{{ form.year.help_text }}</span>{% endif %}
+                                {% for error in form.year.errors %}<div class="hr-cycle-error" role="alert">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="hr-cycle-field">
+                                {{ form.report_period_from.label_tag }}
+                                {{ form.report_period_from }}
+                                {% if form.report_period_from.help_text %}<span class="hr-cycle-help">{{ form.report_period_from.help_text }}</span>{% endif %}
+                                {% for error in form.report_period_from.errors %}<div class="hr-cycle-error" role="alert">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="hr-cycle-field">
+                                {{ form.report_period_to.label_tag }}
+                                {{ form.report_period_to }}
+                                {% if form.report_period_to.help_text %}<span class="hr-cycle-help">{{ form.report_period_to.help_text }}</span>{% endif %}
+                                {% for error in form.report_period_to.errors %}<div class="hr-cycle-error" role="alert">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="hr-cycle-field hr-cycle-field--wide">
+                                <div class="hr-cycle-checkbox">
+                                    {{ form.is_active }}
+                                    <div>
+                                        {{ form.is_active.label_tag }}
+                                        {% if form.is_active.help_text %}<span class="hr-cycle-help">{{ form.is_active.help_text }}</span>{% endif %}
+                                        {% for error in form.is_active.errors %}<div class="hr-cycle-error" role="alert">{{ error }}</div>{% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="hr-cycle-field hr-cycle-field--wide">
+                                <button type="submit" class="hr-cycle-submit">Create appraisal cycle</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <section class="hr-cycle-card" aria-labelledby="existing-cycles-heading">
+                <div class="hr-cycle-card-header">
+                    <h2 id="existing-cycles-heading">Existing cycles</h2>
+                    <p>{{ cycles|length }} cycle{{ cycles|length|pluralize }} configured</p>
+                </div>
+                <div class="hr-cycle-table-wrap">
+                    <table class="table hr-cycle-table">
+                        <thead>
+                            <tr><th>Year</th><th>Report period</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for cycle in cycles %}
+                                <tr>
+                                    <td><strong>{{ cycle.year }}</strong></td>
+                                    <td>
+                                        {% if cycle.report_period_from or cycle.report_period_to %}
+                                            {{ cycle.report_period_from|date:"d M Y"|default:"—" }} – {{ cycle.report_period_to|date:"d M Y"|default:"—" }}
+                                        {% else %}
+                                            Not set
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="hr-cycle-badge{% if not cycle.is_active %} is-inactive{% endif %}">{% if cycle.is_active %}Active{% else %}Inactive{% endif %}</span>
+                                        <span class="hr-cycle-record-note">{{ cycle.appraisal_count }} appraisal record{{ cycle.appraisal_count|pluralize }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="hr-cycle-actions">
+                                            <form
+                                                method="post"
+                                                action="{% url 'set_appraisal_cycle_status' cycle.id %}"
+                                                class="hr-cycle-action-form"
+                                                data-confirm="{% if cycle.is_active %}Deactivate appraisal cycle {{ cycle.year }}? Employees and reviewers will no longer be able to work on this cycle.{% else %}Activate appraisal cycle {{ cycle.year }}? Any other active cycle will be deactivated.{% endif %}"
+                                                data-confirm-title="Change cycle status?"
+                                                data-confirm-label="{% if cycle.is_active %}Deactivate cycle{% else %}Activate cycle{% endif %}"
+                                            >
+                                                {% csrf_token %}
+                                                <input type="hidden" name="is_active" value="{% if cycle.is_active %}false{% else %}true{% endif %}">
+                                                <button type="submit" class="hr-cycle-action hr-cycle-action--toggle">
+                                                    {% if cycle.is_active %}Deactivate{% else %}Activate{% endif %}
+                                                </button>
+                                            </form>
+                                            <form
+                                                method="post"
+                                                action="{% url 'delete_appraisal_cycle' cycle.id %}"
+                                                class="hr-cycle-action-form"
+                                                data-confirm="Delete appraisal cycle {{ cycle.year }}? This action cannot be undone."
+                                                data-confirm-title="Delete appraisal cycle?"
+                                                data-confirm-label="Delete cycle"
+                                                data-confirm-tone="danger"
+                                            >
+                                                {% csrf_token %}
+                                                <button
+                                                    type="submit"
+                                                    class="hr-cycle-action hr-cycle-action--delete"
+                                                    {% if cycle.appraisal_count %}disabled title="Cycles with appraisal records cannot be deleted."{% endif %}
+                                                >Delete</button>
+                                            </form>
+                                        </div>
+                                        {% if cycle.appraisal_count %}<span class="hr-cycle-record-note">Deletion is blocked while appraisal records exist.</span>{% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="hr-cycle-empty">No appraisal cycles have been created yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+</div>
+{% endblock %}

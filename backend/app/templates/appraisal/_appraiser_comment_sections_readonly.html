@@ -1,0 +1,32 @@
+<section class="appraisal-paper" aria-labelledby="appraiser-comments-preview-heading">
+    <h2 class="appraisal-section-title" id="appraiser-comments-preview-heading">SECTION 6: Annual Appraisal (Continuation)</h2>
+    <div class="appraisal-section-body">
+        <strong>Appraiser’s Comments on Work Plan Achievements</strong>
+        <p class="appraisal-help">(Comment on work plan achievements and additional contributions made)</p>
+        <div class="appraisal-comment-box">{{ appraisal.supervisor_comments|default:"No appraiser comments provided."|linebreaksbr }}</div>
+        <div class="appraisal-signature-row">
+            <span><strong>Appraiser’s signature:</strong> {% if appraisal.supervisor_signed_at and appraisal.supervisor %}{{ appraisal.supervisor.user.get_full_name|default:appraisal.supervisor.user.username }}{% else %}Not signed yet{% endif %}</span>
+            <span><strong>Date:</strong> {{ appraisal.supervisor_signed_at|date:"d/m/Y"|default:"—" }}</span>
+        </div>
+    </div>
+</section>
+<section class="appraisal-paper" aria-labelledby="career-development-preview-heading">
+    <h2 class="appraisal-section-title" id="career-development-preview-heading">SECTION 7: Career Development</h2>
+    <div class="appraisal-section-body">
+        <strong>Training and Development - Comments and Plan</strong>
+        <p class="appraisal-help">(To be completed by the Appraiser in discussion with the Appraisee)</p>
+        <div class="appraisal-comment-box">{{ appraisal.career_development_plan|default:"No career development plan provided."|linebreaksbr }}</div>
+    </div>
+</section>
+<section class="appraisal-paper" aria-labelledby="assessment-decision-preview-heading">
+    <h2 class="appraisal-section-title" id="assessment-decision-preview-heading">SECTION 8: Assessment Decision</h2>
+    <div class="appraisal-section-body">
+        <p><strong>Assess the Appraisee’s potential to perform the duties of the next grade, taking account of the assessment of performance in Section 5 above.</strong></p>
+        <ul class="appraisal-choice-list">
+            <li>{% if appraisal.assessment_decision == 'promote_now' %}☒{% else %}☐{% endif %} Outstanding - should be promoted as soon as possible</li>
+            <li>{% if appraisal.assessment_decision == 'suitable' %}☒{% else %}☐{% endif %} Suitable for promotion</li>
+            <li>{% if appraisal.assessment_decision == 'ready_2_3_years' %}☒{% else %}☐{% endif %} Likely to be ready for promotion in 2 to 3 years</li>
+            <li>{% if appraisal.assessment_decision == 'not_ready' %}☒{% else %}☐{% endif %} Not ready for promotion for at least 3 years / unlikely to be promoted further</li>
+        </ul>
+    </div>
+</section>

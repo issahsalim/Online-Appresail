@@ -1,0 +1,10 @@
+<section class="appraisal-paper" aria-labelledby="hod-comments-heading">
+    <h2 class="appraisal-section-title" id="hod-comments-heading">SECTION 10: Head of Department’s / Unit’s Comments on Overall Assessment</h2>
+    <div class="appraisal-section-body">
+        <div class="appraisal-comment-box">{{ appraisal.hod_comments|default:"No HOD comments provided."|linebreaksbr }}</div>
+        <div class="appraisal-signature-row">
+            <span><strong>HOD’s signature:</strong> {% if appraisal.hod_signed_at %}{{ appraisal.hod.user.get_full_name|default:appraisal.hod.user.username }}{% else %}Not signed yet{% endif %}</span>
+            <span><strong>Date:</strong> {{ appraisal.hod_signed_at|date:"d/m/Y"|default:"—" }}</span>
+        </div>
+    </div>
+</section>

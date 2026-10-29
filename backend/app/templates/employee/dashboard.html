@@ -1,56 +1,765 @@
-{% extends 'base.html' %} <!-- Assuming you have a base.html -->
+{% extends 'base.html' %}
+
+{% block title %}My Appraisal | Staff Appraisal System{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2>My Appraisal Dashboard</h2>
-    <hr>
+<div class="employee-page role-dashboard-shell">
+    <style>
+        body:has(.employee-page) { background: #f3f6f8; }
+        body:has(.employee-page) > .container { max-width: none; padding: 0; width: 100%; }
+        .employee-page {
+            color: #294653;
+            margin: 0;
+            max-width: none;
+            min-height: calc(100vh - 64px);
+            padding: 0;
+        }
+        .employee-dashboard-content { margin: 0 auto; max-width: 1500px; }
+        .employee-hero {
+            align-items: center;
+            background: linear-gradient(115deg, #142d3c 0%, #1d4254 100%);
+            border-radius: 22px;
+            box-shadow: 0 18px 42px rgba(20, 45, 60, .14);
+            color: #fff;
+            display: flex;
+            gap: 1.5rem;
+            justify-content: space-between;
+            margin-bottom: 1.2rem;
+            overflow: hidden;
+            padding: clamp(1.4rem, 3vw, 2.2rem);
+            position: relative;
+        }
+        .employee-hero::after {
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 50%;
+            content: "";
+            height: 260px;
+            position: absolute;
+            right: -70px;
+            top: -150px;
+            width: 260px;
+        }
+        .employee-hero-copy { position: relative; z-index: 1; }
+        .employee-eyebrow {
+            color: #c2d0d7;
+            font-size: .73rem;
+            font-weight: 750;
+            letter-spacing: .13em;
+            margin-bottom: .55rem;
+            text-transform: uppercase;
+        }
+        .employee-hero h1 {
+            font-size: clamp(1.75rem, 4vw, 2.4rem);
+            font-weight: 780;
+            letter-spacing: -.045em;
+            margin: 0 0 .45rem;
+        }
+        .employee-hero p { color: #d1dce1; margin: 0; max-width: 640px; }
+        .employee-cycle {
+            background: rgba(255,255,255,.1);
+            border: 1px solid rgba(255,255,255,.17);
+            border-radius: 12px;
+            color: #fff;
+            flex: 0 0 auto;
+            font-size: .8rem;
+            font-weight: 700;
+            padding: .75rem .95rem;
+            position: relative;
+            z-index: 1;
+        }
+        .employee-workspace {
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(20, 45, 60, .05);
+            overflow: hidden;
+        }
+        .employee-workspace-heading {
+            align-items: flex-start;
+            border-bottom: 1px solid #e8eef0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .8rem;
+            justify-content: space-between;
+            padding: 1.3rem clamp(1rem, 2.5vw, 1.7rem);
+        }
+        .employee-workspace-heading h2 { color: #173747; font-size: 1.1rem; font-weight: 760; margin: 0 0 .28rem; }
+        .employee-workspace-heading p { color: #72828b; font-size: .84rem; margin: 0; }
+        .employee-status {
+            background: #edf2f5;
+            border: 1px solid #dbe4e8;
+            border-radius: 999px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .75rem;
+            font-weight: 750;
+            padding: .38rem .72rem;
+            white-space: nowrap;
+        }
+        .employee-status.is-returned { background: #f3f4f5; border-color: #d8dfe3; color: #3f5662; }
+        .employee-status.is-complete { background: #e9eef1; border-color: #d4dfe4; color: #173747; }
+        .employee-status.is-submitted { background: #edf2f5; border-color: #dbe4e8; color: #23495b; }
+        .employee-status.is-under-review { background: #f7f1df; border-color: #ead9a6; color: #765d18; }
+        .employee-status.is-draft { background: #f2effa; border-color: #ded7f1; color: #51447d; }
+        .employee-body { padding: clamp(1rem, 2.5vw, 1.7rem); }
+        .employee-appraisal-stats {
+            display: grid;
+            gap: .75rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-bottom: 1rem;
+        }
+        .employee-appraisal-stat {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 12px;
+            display: flex;
+            gap: .75rem;
+            min-width: 0;
+            padding: .9rem 1rem;
+        }
+        .employee-appraisal-stat-icon {
+            align-items: center;
+            background: #edf2f5;
+            border-radius: 9px;
+            color: #23495b;
+            display: flex;
+            flex: 0 0 36px;
+            height: 36px;
+            justify-content: center;
+        }
+        .employee-appraisal-stat:nth-child(2) .employee-appraisal-stat-icon { background: #f7f1df; color: #765d18; }
+        .employee-appraisal-stat:nth-child(3) .employee-appraisal-stat-icon { background: #e8f4ed; color: #27704c; }
+        .employee-appraisal-stat-label {
+            color: #72828b;
+            display: block;
+            font-size: .66rem;
+            font-weight: 750;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .employee-appraisal-stat-value { color: #173747; display: block; font-size: 1.15rem; font-weight: 780; line-height: 1.2; }
+        .employee-appraisal-stat-note { color: #72828b; display: block; font-size: .7rem; margin-top: .12rem; }
+        .employee-application-list {
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .employee-application-list-heading {
+            border-bottom: 1px solid #e8eef0;
+            padding: 1rem;
+        }
+        .employee-application-list-heading h2 { color: #173747; font-size: 1rem; font-weight: 760; margin: 0 0 .2rem; }
+        .employee-application-list-heading p { color: #72828b; font-size: .8rem; margin: 0; }
+        .employee-application-card {
+            align-items: center;
+            border-bottom: 1px solid #edf2f5;
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: auto minmax(0, 1fr) minmax(120px, 155px) auto;
+            padding: 1.15rem;
+        }
+        .employee-application-card:last-child { border-bottom: 0; }
+        .employee-application-icon {
+            align-items: center;
+            background: #173f50;
+            border-radius: 10px;
+            color: #fff;
+            display: flex;
+            flex: 0 0 42px;
+            font-size: .75rem;
+            font-weight: 800;
+            height: 42px;
+            justify-content: center;
+            width: 42px;
+        }
+        .employee-application-main { min-width: 0; }
+        .employee-application-title-row {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem .65rem;
+            margin-bottom: .2rem;
+        }
+        .employee-application-title-row h3 { color: #173747; font-size: .95rem; font-weight: 750; margin: 0; }
+        .employee-application-main p { color: #72828b; font-size: .78rem; margin: 0; }
+        .employee-application-progress { margin-top: .75rem; max-width: 420px; }
+        .employee-application-progress-track {
+            background: #e4eaed;
+            border-radius: 999px;
+            height: 5px;
+            overflow: hidden;
+        }
+        .employee-application-progress-fill {
+            background: #34596a;
+            border-radius: inherit;
+            height: 100%;
+        }
+        .employee-application-progress-label { color: #72828b; display: block; font-size: .68rem; margin-top: .2rem; text-align: center; }
+        .employee-application-meta { min-width: 0; }
+        .employee-application-meta-label {
+            color: #839198;
+            display: block;
+            font-size: .62rem;
+            font-weight: 750;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .employee-application-meta-value { color: #294653; display: block; font-size: .78rem; font-weight: 700; margin-top: .15rem; }
+        .employee-application-card .employee-actions { justify-content: flex-end; }
+        .employee-application-card .employee-action,
+        .employee-application-card .employee-action-secondary { min-height: 38px; padding: .5rem .75rem; white-space: nowrap; }
+        .employee-return-note {
+            background: #f5f7f8;
+            border: 1px solid #dce4e8;
+            border-left: 4px solid #547181;
+            border-radius: 12px;
+            color: #425d69;
+            margin-bottom: 1.3rem;
+            padding: 1rem 1.1rem;
+        }
+        .employee-return-note strong { color: #173747; display: block; margin-bottom: .25rem; }
+        .employee-return-note p { margin: 0; }
+        .employee-return-instruction { color: #647b85; font-size: .82rem; margin-top: .45rem; }
+        .employee-progress {
+            background: #f7f9fa;
+            border: 1px solid #e4eaed;
+            border-radius: 15px;
+            margin-bottom: 1.35rem;
+            padding: 1.1rem;
+        }
+        .employee-progress-header {
+            align-items: center;
+            display: flex;
+            gap: .75rem;
+            justify-content: space-between;
+            margin-bottom: .9rem;
+        }
+        .employee-progress-heading {
+            align-items: center;
+            color: #173747;
+            display: flex;
+            font-size: .84rem;
+            font-weight: 750;
+            gap: .55rem;
+            margin: 0;
+        }
+        .employee-progress-count { color: #72828b; font-size: .78rem; white-space: nowrap; }
+        .employee-progress-count strong { color: #34596a; }
+        .employee-progress-overall { margin-bottom: 1.35rem; }
+        .employee-progress-overall-label {
+            color: #72828b;
+            display: flex;
+            font-size: .72rem;
+            font-weight: 750;
+            justify-content: space-between;
+            letter-spacing: .04em;
+            margin-bottom: .4rem;
+            text-transform: uppercase;
+        }
+        .employee-progress-overall-label strong { color: #34596a; font-size: .78rem; }
+        .employee-progress-track {
+            background: #dfe7ea;
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+        }
+        .employee-progress-fill {
+            background: linear-gradient(90deg, #34596a, #5b8292);
+            border-radius: inherit;
+            height: 100%;
+            transition: width .3s ease;
+        }
+        .employee-progress-stages { overflow-x: auto; padding: .25rem 0 .4rem; }
+        .employee-progress-steps {
+            display: grid;
+            gap: .25rem;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            list-style: none;
+            margin: 0;
+            min-width: 540px;
+            padding: 0;
+        }
+        .employee-progress-step {
+            color: #839198;
+            font-size: .72rem;
+            font-weight: 650;
+            min-width: 0;
+            position: relative;
+            text-align: center;
+        }
+        .employee-progress-step::after {
+            background: #d9e1e5;
+            content: "";
+            height: 3px;
+            left: 50%;
+            position: absolute;
+            right: -50%;
+            top: 16px;
+            z-index: 0;
+        }
+        .employee-progress-step.is-complete::after { background: #7895a1; }
+        .employee-progress-step:last-child::after { display: none; }
+        .employee-progress-marker {
+            align-items: center;
+            background: #edf2f5;
+            border: 2px solid #d9e1e5;
+            border-radius: 50%;
+            color: #72828b;
+            display: flex;
+            font-size: .72rem;
+            font-weight: 750;
+            height: 34px;
+            justify-content: center;
+            margin: 0 auto .5rem;
+            position: relative;
+            width: 34px;
+            z-index: 1;
+        }
+        .employee-progress-step.is-complete .employee-progress-marker {
+            background: #34596a;
+            border-color: #34596a;
+            color: #fff;
+        }
+        .employee-progress-step.is-current .employee-progress-marker {
+            background: #fff;
+            border: 3px solid #547181;
+            box-shadow: 0 0 0 4px rgba(84, 113, 129, .13);
+            color: #23495b;
+        }
+        .employee-progress-step.is-current { color: #173747; font-weight: 750; }
+        .employee-progress-step-label { display: block; line-height: 1.3; overflow-wrap: anywhere; }
+        .employee-progress-step-state {
+            color: #839198;
+            display: block;
+            font-size: .65rem;
+            font-weight: 600;
+            margin-top: .2rem;
+        }
+        .employee-progress-step.is-current .employee-progress-step-state { color: #547181; }
+        .employee-summary {
+            align-items: center;
+            background: #fff;
+            border: 1px solid #e3eaed;
+            border-radius: 14px;
+            display: flex;
+            gap: .9rem;
+            margin-bottom: 1.35rem;
+            padding: 1rem;
+        }
+        .employee-summary-icon {
+            align-items: center;
+            background: #edf2f5;
+            border-radius: 11px;
+            color: #23495b;
+            display: flex;
+            flex: 0 0 40px;
+            height: 40px;
+            justify-content: center;
+        }
+        .employee-summary strong { color: #173747; display: block; font-size: .87rem; }
+        .employee-summary span { color: #72828b; display: block; font-size: .8rem; margin-top: .15rem; }
+        .employee-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+        .employee-action {
+            align-items: center;
+            background: #173f50;
+            border: 1px solid #173f50;
+            border-radius: 9px;
+            color: #fff;
+            display: inline-flex;
+            font-size: .86rem;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 43px;
+            padding: .62rem 1rem;
+            text-decoration: none;
+            transition: background .16s ease, transform .16s ease;
+        }
+        .employee-action:hover { background: #20596a; color: #fff; transform: translateY(-1px); }
+        .employee-action-secondary {
+            background: #edf2f5;
+            border: 1px solid #d7e0e5;
+            border-radius: 9px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .86rem;
+            font-weight: 700;
+            justify-content: center;
+            min-height: 43px;
+            padding: .62rem 1rem;
+            text-decoration: none;
+        }
+        .employee-action-secondary:hover { background: #e1e9ed; color: #173747; }
+        .employee-no-cycle {
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(20, 45, 60, .05);
+            padding: 2.5rem 1.5rem;
+            text-align: center;
+        }
+        .employee-no-cycle h2 { color: #173747; font-size: 1.15rem; font-weight: 750; }
+        .employee-no-cycle p { color: #72828b; margin: 0; }
+        .employee-history-card {
+            background: #fff;
+            border: 1px solid #e0e8ec;
+            border-radius: 18px;
+            box-shadow: 0 12px 30px rgba(20, 45, 60, .05);
+            margin-top: 1.5rem;
+            overflow: hidden;
+        }
+        .employee-history-count {
+            background: #edf2f5;
+            border: 1px solid #dbe4e8;
+            border-radius: 999px;
+            color: #23495b;
+            display: inline-flex;
+            font-size: .75rem;
+            font-weight: 750;
+            padding: .35rem .75rem;
+        }
+        .employee-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+        .employee-table th {
+            background: #f7f9fa;
+            border-bottom: 1px solid #e5ecef;
+            color: #496370;
+            font-size: .76rem;
+            font-weight: 750;
+            letter-spacing: .04em;
+            padding: .85rem 1rem;
+            text-transform: uppercase;
+        }
+        .employee-table td {
+            border-bottom: 1px solid #edf2f5;
+            color: #2c4a57;
+            font-size: .86rem;
+            padding: .95rem 1rem;
+            vertical-align: middle;
+        }
+        .employee-table tr:last-child td { border-bottom: none; }
+        .employee-table tr:hover td { background: #fafbfc; }
+        .employee-supervisor-pill {
+            background: #f8fafb;
+            border: 1px solid #e5ecef;
+            border-radius: 10px;
+            color: #375360;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            font-size: .82rem;
+            margin-top: .7rem;
+            padding: .45rem .85rem;
+        }
+        @media (max-width: 767.98px) {
+            .employee-progress-stages{display:block;overflow-x:auto;padding:.25rem 0 .4rem;}
+            .employee-page { display: block; }
+            .employee-dashboard-content { padding: 1rem; }
+            .employee-hero { align-items: flex-start; border-radius: 18px; flex-direction: column; }
+            .employee-cycle { align-self: flex-start; }
+            .employee-workspace-heading { flex-direction: column; }
+            .employee-progress { padding: .85rem; }
+            .employee-progress-steps { gap: .1rem; }
+            .employee-progress-step { font-size: .65rem; }
+            .employee-progress-step::after { top: 14px; }
+            .employee-progress-marker { height: 30px; width: 30px; }
+            .employee-progress-step-state { font-size: .6rem; }
+            .employee-actions { flex-direction: column; }
+            .employee-action,
+            .employee-action-secondary { width: 100%; }
+            .employee-appraisal-stats { grid-template-columns: 1fr; }
+            .employee-application-card { align-items: start; grid-template-columns: auto minmax(0, 1fr); }
+            .employee-application-main { grid-column: 2; }
+            .employee-application-meta { grid-column: 2; }
+            .employee-application-card .employee-actions { grid-column: 1 / -1; }
+            .employee-table th, .employee-table td { padding: .65rem .75rem; font-size: .78rem; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .employee-page *,
+            .employee-page *::before,
+            .employee-page *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+        }
+    </style> 
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-        {% endfor %}
-    {% endif %}
-    {% if appraisal %}
-        <div class="card">
-            <div class="card-body">
-                <h4 class="card-title">Year: {{ appraisal.cycle.year }}</h4>
-                <h5 class="card-subtitle mb-2 text-muted">Status: 
-                    <span class="badge bg-info">{{ appraisal.get_status_display }}</span>
-                </h5>
-                {% if appraisal.status == 'returned_employee' and latest_return %}
-                    <div class="alert alert-warning mt-3">
-                        <strong>Returned by {{ latest_return.reviewer_name }} ({{ latest_return.get_stage_display }}):</strong>
-                        {{ latest_return.comment }}
-                        <div class="mt-2">Please update your appraisal, then use “Save and Submit to Supervisor”.</div>
+    <aside class="role-dashboard-sidebar" aria-label="Employee dashboard navigation">
+        <!-- <div class="role-sidebar-brand">
+            <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+            <span>Staff Appraisal<br><small class="fw-normal opacity-75">EMPLOYEE WORKSPACE</small></span>
+            <button class="role-sidebar-toggle" type="button" aria-controls="employee-dashboard-navigation" aria-expanded="false">
+                <span aria-hidden="true">☰</span> Menu
+            </button>
+        </div>  -->
+
+        <div class="role-sidebar-label">Workspace</div>
+        <nav class="role-sidebar-nav" id="employee-dashboard-navigation">
+            <button class="role-sidebar-link active" type="button" data-role-section-target="active">
+                <span class="role-sidebar-icon" aria-hidden="true">◷</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">Dashboard</span>
+                    <span class="role-sidebar-link-note">Current cycle progress</span>
+                </span>
+            </button>
+            <button class="role-sidebar-link" type="button" data-role-section-target="history">
+                <span class="role-sidebar-icon" aria-hidden="true">▤</span>
+                <span class="role-sidebar-link-copy">
+                    <span class="role-sidebar-link-title">My appraisal </span>
+                    <span class="role-sidebar-link-note">Past cycles and results</span>
+                </span>
+                <span class="role-sidebar-count">{{ all_appraisals|length }}</span>
+            </button>
+        </nav>
+        <div class="role-sidebar-label">Signed in</div>
+        <div class="small px-2 text-white-50">{{ request.user.username }}</div>
+    </aside>
+
+    <main class="role-dashboard-content employee-dashboard-content">
+    <header class="mt-5">
+        <div class="employee-hero-copy">
+            <!-- <div class="employee-eyebrow">Employee workspace</div> -->
+            <h2>Welcome back, {{ request.user.first_name|default:request.user.username }}</h2>
+            <p>Manage your applications and keep track of important updates.
+
+</p>
+        </div>
+        <!-- {% if active_cycles %}
+            <div class="employee-cycle">
+                Active cycle{{ active_cycles|length|pluralize }} · {% for c in active_cycles %}{{ c.year }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+        {% endif %} -->
+    </header>
+
+    <section class="role-dashboard-section" data-role-section="active" aria-label="Active appraisals">
+    {% if active_appraisal_cards %}
+        <!-- <div class="employee-history-search mb-3">
+            <label for="employee-active-search" class="form-label fw-semibold">Find an active appraisal</label>
+            <input
+                id="employee-active-search"
+                type="search"
+                class="form-control"
+                placeholder="Search by cycle year or status"
+                autocomplete="off"
+                data-dashboard-search
+                data-search-target="employee-active-appraisals"
+                data-search-status="employee-active-search-status"
+            >
+            <div id="employee-active-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
+        </div> -->
+        <div class="employee-appraisal-stats" aria-label="Appraisal summary">
+            <article class="employee-appraisal-stat">
+                <span class="employee-appraisal-stat-icon" aria-hidden="true">▤</span>
+                <div>
+                    <span class="employee-appraisal-stat-label">Total appraisals</span>
+                    <strong class="employee-appraisal-stat-value">{{ active_appraisal_count }}</strong>
+                    <span class="employee-appraisal-stat-note">Across active cycles</span>
+                </div>
+            </article>
+            <article class="employee-appraisal-stat">
+                <span class="employee-appraisal-stat-icon" aria-hidden="true">◷</span>
+                <div>
+                    <span class="employee-appraisal-stat-label">Incomplete</span>
+                    <strong class="employee-appraisal-stat-value">{{ incomplete_appraisal_count }}</strong>
+                    <span class="employee-appraisal-stat-note">Drafts or returned for updates</span>
+                </div>
+            </article>
+            <article class="employee-appraisal-stat">
+                <span class="employee-appraisal-stat-icon" aria-hidden="true">✓</span>
+                <div>
+                    <span class="employee-appraisal-stat-label">Submitted</span>
+                    <strong class="employee-appraisal-stat-value">{{ submitted_appraisal_count }}</strong>
+                    <span class="employee-appraisal-stat-note">Received for review</span>
+                </div>
+            </article>
+        </div>
+        <section class="employee-application-list" aria-labelledby="employee-applications-heading">
+            <header class="employee-application-list-heading">
+                <h2 id="employee-applications-heading">My appraisals</h2>
+                <p>Continue a draft or view the progress of a submitted appraisal.</p>
+            </header>
+        <div id="employee-active-appraisals">
+        {% for card in active_appraisal_cards %}
+            <article class="employee-application-card" data-search-item>
+                <span class="employee-application-icon" aria-hidden="true">APP</span>
+                <div class="employee-application-main">
+                    <div class="employee-application-title-row">
+                        <span class="employee-status{% if card.appraisal.status == 'returned_employee' or card.appraisal.status == 'returned_supervisor' or card.appraisal.status == 'returned_hod' %} is-returned{% elif card.is_completed %} is-complete{% elif card.appraisal.employee_signed_at %} is-submitted{% else %} is-draft{% endif %}" style="padding:1px 5px">
+                            {{ card.appraisal.status|title }}
+                        </span> 
                     </div>
-                {% endif %}
-                
-                <p class="card-text mt-3">
-                    {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %}
-                        You are currently filling out your goals. Once you submit, you will not be able to edit this form.
-                    {% else %}
-                        Your form has been submitted. You can view it below.
-                    {% endif %}
-                </p>
-
-                <div class="mt-4">
-                    <a href="{% url 'fill_targets' %}" class="btn btn-primary">
-                        {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %} Edit My Goals {% else %} View My Goals {% endif %}
-                    </a>
-
-                    {% if appraisal.status == 'draft' %}
-                        <form method="POST" action="{% url 'submit_to_supervisor' appraisal.id %}" style="display:inline;">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-success" onclick="return confirm('Are you sure you want to submit? You cannot edit after this.')">
-                                Submit to Supervisor
-                            </button>
-                        </form>
+                    <h3> {{ card.cycle.year }} Appraisal</h3>
+                    <p>
+                        {% if card.appraisal.status == 'returned_employee' %}
+                            This appraisal was returned to you for updates.
+                        {% elif card.is_completed %}
+                            Your appraisal review is complete and locked.
+                        {% elif card.appraisal.employee_signed_at %}
+                            Your appraisal is moving through the review process.
+                        {% else %}
+                            Continue a saved application or view its progress.
+                        {% endif %}
+                    </p>
+                    <div class="employee-application-progress">
+                        <div
+                            class="employee-application-progress-track"
+                            role="progressbar"
+                            aria-label="Cycle {{ card.cycle.year }} appraisal progress"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                            aria-valuenow="{{ card.progress_percent }}"
+                        >
+                            <div class="employee-application-progress-fill" style="width: {{ card.progress_percent }}%"></div>
+                        </div>
+                        <span class="employee-application-progress-label">{{ card.progress_percent }}% complete</span>
+                    </div>
+                    {% if card.appraisal.status == 'returned_employee' and card.latest_return %}
+                        <div class="employee-return-note" role="status">
+                            <strong>Returned by {{ card.latest_return.reviewer_name }} · {{ card.latest_return.get_stage_display }}</strong>
+                            <p>{{ card.latest_return.comment }}</p>
+                            <div class="employee-return-instruction">Update your appraisal, then save and submit it again to your supervisor.</div>
+                        </div>
                     {% endif %}
                 </div>
-            </div>
+                <div class="employee-application-meta">
+                    <span class="employee-application-meta-label">{% if card.appraisal.employee_signed_at %}Submitted{% else %}Submission status{% endif %}</span>
+                    <strong class="employee-application-meta-value">
+                        {% if card.appraisal.employee_signed_at %}
+                            {{ card.appraisal.employee_signed_at|date:"j F Y" }}
+                        {% else %}
+                            Not submitted
+                        {% endif %}
+                    </strong>
+                </div>
+                <div class="employee-actions">
+                        {% if card.is_editable %}
+                            <a href="{% url 'fill_targets_year' card.cycle.year %}" class="employee-action">View {{ card.cycle.year }} Appraisal</a>
+                            {% if card.appraisal.status == 'draft' %}
+                                <form method="post" action="{% url 'submit_to_supervisor' card.appraisal.id %}">
+                                    {% csrf_token %}
+                                    <button
+                                        type="submit"
+                                        class="employee-action-secondary"
+                                        data-confirm="Submit this appraisal to your supervisor? You cannot edit it afterward."
+                                        data-confirm-title="Submit appraisal?"
+                                        data-confirm-label="Submit appraisal"
+                                    >Submit to supervisor</button>
+                                </form>
+                            {% endif %}
+                        {% else %}
+                            <a href="{% url 'employee_appraisal_detail' card.appraisal.id %}" class="employee-action">View {{ card.cycle.year }} appraisal</a>
+                            {% if card.is_completed %}
+                                <a href="{% url 'employee_appraisal_pdf' card.appraisal.id %}" class="employee-action-secondary">Download completed appraisal PDF</a>
+                            {% endif %}
+                        {% endif %}
+                </div>
+            </article>
+        {% endfor %}
         </div>
+        </section>
     {% else %}
-        <p>No active appraisal cycle found. Please contact HR.</p>
+        <section class="employee-no-cycle">
+            <h2>No active appraisal cycle</h2>
+            <p>Please contact HR for information about the next appraisal cycle.</p>
+        </section>
     {% endif %}
+    </section>
+
+    <section class="role-dashboard-section employee-history-card" data-role-section="history" aria-label="Appraisal history" hidden>
+        <div class="employee-workspace-heading">
+            <div>
+                <h2>My Appraisal History</h2>
+                <p>Track your past evaluations, final scores, and completed appraisal records.</p>
+            </div>
+            <span class="employee-history-count">{{ all_appraisals|length }} record{{ all_appraisals|length|pluralize }}</span>
+        </div>
+        <div class="employee-body" style="padding: 0;">
+            {% if all_appraisals %}
+                <div class="employee-history-search px-3 pt-3">
+                    <label for="employee-history-search" class="form-label fw-semibold">Search appraisal history</label>
+                    <input
+                        id="employee-history-search"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search by cycle, supervisor, status, score, or rating"
+                        autocomplete="off"
+                        data-dashboard-search
+                        data-search-target="employee-appraisal-history"
+                        data-search-status="employee-history-search-status"
+                    >
+                    <div id="employee-history-search-status" class="small text-muted mt-2" role="status" aria-live="polite"></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="employee-table">
+                        <thead>
+                            <tr>
+                                <th>Cycle</th>
+                                <th>Supervisor</th>
+                                <th>Status</th>
+                                <th>Score / Rating</th>
+                                <th>Date Completed</th>
+                                <th style="text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employee-appraisal-history">
+                            {% for item in all_appraisals %}
+                                <tr data-search-item>
+                                    <td>
+                                        <strong>Cycle {{ item.cycle.year }}</strong>
+                                        {% if item.cycle.is_active %}
+                                            <span class="badge bg-primary ms-1" style="font-size: 0.65rem;">Active</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.supervisor and item.supervisor.user %}
+                                            {{ item.supervisor.user.get_full_name|default:item.supervisor.user.username }}
+                                        {% else %}
+                                            Pending HR
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="employee-status{% if item.status == 'returned_employee' %} is-returned{% elif item.status == 'completed' %} is-complete{% endif %}">
+                                            {{ item.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if item.status == 'completed' and item.overall_percentage is not None %}
+                                            <strong>{{ item.overall_percentage }}%</strong>
+                                            {% if item.final_rating %}<small style="color: #647b85; display: block;">{{ item.final_rating }}</small>{% endif %}
+                                        {% elif item.status == 'completed' %}
+                                            <span style="color: #647b85;">Completed</span>
+                                        {% else %}
+                                            <span style="color: #8b9ea7;">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ item.hr_approved_at|date:"d M Y"|default:"In Progress" }}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div style="display: inline-flex; gap: .4rem; justify-content: flex-end;">
+                                            {% if item.status in 'draft,returned_employee' and item.cycle.is_active %}
+                                                <a href="{% url 'fill_targets_year' item.cycle.year %}" class="btn btn-sm btn-outline-primary">Edit Goals</a>
+                                            {% else %}
+                                                <a href="{% url 'employee_appraisal_detail' item.id %}" class="btn btn-sm btn-outline-secondary">View</a>
+                                            {% endif %}
+                                            {% if item.status == 'completed' %}
+                                                <a href="{% url 'employee_appraisal_pdf' item.id %}" class="btn btn-sm btn-outline-dark" title="Download / Print PDF">PDF</a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div style="padding: 2rem 1.5rem; text-align: center; color: #72828b;">
+                    <p style="margin: 0;">No appraisal records found.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+    </main>
 </div>
 {% endblock %}
