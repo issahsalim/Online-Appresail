@@ -9,6 +9,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     
     <style>
+        html { overflow-x: clip; }
         /* Optional: Custom Styles */
         body {
             background-color: #f8f9fa; /* Light gray background */
@@ -32,6 +33,16 @@
             padding: .65rem .8rem;
         }
         .appraisal-section-body { padding: .8rem; }
+        .appraisal-fields {
+            display: grid;
+            gap: .8rem 1rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .appraisal-field {
+            border-bottom: 1px solid #e8edef;
+            min-width: 0;
+            padding: .35rem 0;
+        }
         .appraisal-help { color: #404040; font-size: .84rem; margin: 0 0 .65rem; }
         .appraisal-comment-box {
             border: 2px solid #858585;
@@ -73,13 +84,55 @@
         .appraisal-rating-scale th, .appraisal-rating-scale td { font-size: .74rem; padding: .3rem !important; text-align: center; }
         .appraisal-rating-scale tbody th { text-align: left; }
         .appraisal-target-review-table { min-width: 1120px; }
+        @media (max-width: 575.98px) {
+            .appraisal-fields { grid-template-columns: 1fr; }
+        }
         @media print {
+            @page { size: A4 portrait; margin: 10mm; }
+            .appraisal-section-title {
+                -webkit-print-color-adjust: exact !important;
+                background-color: #a43a10 !important;
+                color: #fff !important;
+                print-color-adjust: exact !important;
+            }
             body { background: #fff !important; }
             body > nav,
             .no-print,
             .messages { display: none !important; }
             .container { margin: 0 !important; max-width: none !important; padding: 0 !important; width: 100% !important; }
-            .appraisal-paper { border: 1px solid #a43a10; box-shadow: none !important; break-inside: avoid; }
+            .table-responsive {
+                overflow: visible !important;
+                width: 100% !important;
+            }
+            .table-responsive > table,
+            .appraisal-target-review-table {
+                min-width: 0 !important;
+                table-layout: auto !important;
+                width: 100% !important;
+            }
+            .table th,
+            .table td {
+                overflow-wrap: anywhere;
+                white-space: normal !important;
+            }
+            .appraisal-paper {
+                border: 1px solid #a43a10;
+                box-shadow: none !important;
+                break-inside: auto !important;
+                overflow: visible !important;
+                page-break-inside: auto !important;
+            }
+            .appraisal-paper > .appraisal-section-title,
+            .appraisal-section > .appraisal-section-heading {
+                break-after: avoid;
+                page-break-after: avoid;
+            }
+            .appraisal-paper tr,
+            .appraisal-section tr,
+            .appraisal-readonly-card {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
             a { color: inherit !important; text-decoration: none !important; }
         }
         .navbar-brand {
@@ -123,7 +176,7 @@
             justify-content: center;
         }
         .role-sidebar-label { color: #8fa5b1; font-size: .68rem; font-weight: 750; letter-spacing: .12em; margin: 1.2rem .7rem .55rem; text-transform: uppercase; }
-        .role-sidebar-nav { display: grid; gap: .55rem; }
+        .role-sidebar-nav { display: grid; gap: .55rem; grid-template-columns: minmax(0, 1fr); }
         .role-sidebar-link {
             align-items: center;
             background: transparent;
@@ -152,57 +205,180 @@
         .role-sidebar-link.active .role-sidebar-link-note { color: #b2d2d3; }
         .role-sidebar-count { align-items: center; background: rgba(39,200,181,.14); border: 1px solid rgba(99,221,207,.2); border-radius: 999px; color: #83e7dc; display: inline-flex; font-size: .7rem; font-weight: 750; justify-content: center; margin-left: auto; min-width: 27px; padding: .22rem .48rem; }
         .role-sidebar-toggle { display: none; }
+        .role-sidebar-backdrop { display: none; }
+        .role-sidebar-drawer-brand { display: none; }
         .role-dashboard-content { flex: 1; min-width: 0; padding: clamp(1.25rem, 3vw, 2.5rem); }
         .role-dashboard-section[hidden] { display: none !important; }
         .role-dashboard-section:not([hidden]) { animation: role-section-enter .25s ease both; }
         @keyframes role-section-enter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 767.98px) {
             .role-dashboard-shell { display: block; }
-            .role-dashboard-sidebar { min-height: 0; padding: .8rem 1rem; position: static; }
-            .role-sidebar-brand { border: 0; justify-content: space-between; margin: 0; padding: 0; }
-            .role-sidebar-toggle { align-items: center; background: #214457; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; color: #fff; display: inline-flex; gap: .45rem; padding: .45rem .7rem; }
-            .role-sidebar-nav { display: none; gap: .45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .8rem; }
-            .role-dashboard-sidebar.is-expanded .role-sidebar-nav { display: grid; }
+            .role-dashboard-sidebar { background: transparent; min-height: 0; padding: 0; position: static; z-index: auto; }
+            .role-sidebar-brand { display: none; }
+            .role-sidebar-toggle {
+                align-items: center;
+                background: #142d3c;
+                border: 1px solid rgba(255,255,255,.2);
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(4,22,32,.2);
+                color: #fff;
+                display: inline-flex;
+                flex: 0 0 42px;
+                height: 42px;
+                justify-content: center;
+                left: .85rem;
+                margin: 0;
+                order: 0;
+                padding: .45rem;
+                position: fixed;
+                top: 4.5rem;
+                z-index: 1035;
+            }
+            .role-sidebar-toggle-label { display: none; }
+            .role-sidebar-label { display: none; }
+            .role-sidebar-backdrop:not([hidden]) {
+                background: rgba(5, 20, 29, .55);
+                border: 0;
+                display: block;
+                inset: 0;
+                position: fixed;
+                z-index: 1040;
+            }
+            .role-sidebar-backdrop[hidden] { display: none !important; }
+            .role-sidebar-nav {
+                display: grid;
+                gap: .45rem;
+                grid-template-columns: minmax(0, 1fr);
+                align-content: start;
+                background: #142d3c;
+                bottom: 0;
+                box-shadow: 12px 0 32px rgba(4, 22, 32, .24);
+                left: 0;
+                margin: 0;
+                max-width: min(84vw, 300px);
+                overflow-x: hidden;
+                overflow-y: auto;
+                padding: 1.25rem 1rem;
+                position: fixed;
+                top: 0;
+                transform: translateX(-105%);
+                transition: transform .28s ease, visibility 0s linear .28s;
+                visibility: hidden;
+                width: 300px;
+                z-index: 1041;
+            }
+            .role-sidebar-drawer-brand {
+                align-items: center;
+                border-bottom: 1px solid rgba(255,255,255,.12);
+                color: #fff;
+                display: flex;
+                gap: .75rem;
+                margin: 0 0 .75rem;
+                padding: .25rem .2rem 1rem;
+            }
+            .role-sidebar-drawer-copy {
+                flex: 1;
+                font-size: .88rem;
+                font-weight: 750;
+                line-height: 1.25;
+                min-width: 0;
+            }
+            .role-sidebar-drawer-copy small {
+                color: #b7c8d0;
+                display: block;
+                font-size: .68rem;
+                font-weight: 500;
+                margin-top: .2rem;
+            }
+            .role-sidebar-close {
+                align-items: center;
+                background: rgba(255,255,255,.08);
+                border: 1px solid rgba(255,255,255,.14);
+                border-radius: 9px;
+                color: #fff;
+                display: inline-flex;
+                flex: 0 0 36px;
+                height: 36px;
+                justify-content: center;
+            }
+            .role-dashboard-sidebar.is-expanded .role-sidebar-nav {
+                transform: none;
+                visibility: visible;
+                transition-delay: 0s;
+            }
             .role-sidebar-link { gap: .5rem; min-height: 52px; min-width: 0; padding: .5rem; }
             .role-sidebar-link:hover { transform: none; }
             .role-sidebar-link-title { font-size: .76rem; }
             .role-sidebar-link-note { display: none; }
             .role-sidebar-icon { flex-basis: 32px; height: 32px; }
             .role-sidebar-link.active { box-shadow: inset 0 0 0 1px rgba(39,200,181,.25); }
-            .role-dashboard-content { padding: 1.1rem; }
+            .role-dashboard-content { padding: 4.75rem 1.1rem 1.1rem; }
         }
-        @media (prefers-reduced-motion: reduce) { .role-dashboard-shell *, .role-dashboard-shell *::before, .role-dashboard-shell *::after { transition-duration: .01ms !important; } }
+        @media (prefers-reduced-motion: reduce) {
+            .role-dashboard-shell *, .role-dashboard-shell *::before, .role-dashboard-shell *::after {
+                animation-duration: .01ms !important;
+                transition-duration: .01ms !important;
+            }
+            .role-sidebar-nav { transition-duration: .01ms !important; }
+        }
         .navbar-appraisal {
             background: #142d3c;
             box-shadow: 0 3px 14px rgba(9, 43, 70, .12);
         }
         .navbar-appraisal .navbar-brand { letter-spacing: .02em; }
-        .navbar-user {
+        .navbar-account-toggle {
             align-items: center;
-            color: #d9e4e9;
-            display: flex;
-            font-size: .9rem;
-            gap: .35rem;
-            padding: .5rem .8rem;
-        }
-        .navbar-user strong { color: #fff; }
-        .navbar-logout {
-            background: rgba(255, 255, 255, .08);
-            border: 1px solid rgba(255, 255, 255, .25);
-            border-radius: 8px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, .55);
+            border-radius: 12px;
             color: #fff;
-            font-size: .88rem;
+            display: flex;
+            font-size: 1rem;
             font-weight: 650;
-            margin: .25rem 0 .25rem .5rem;
-            padding: .45rem .8rem;
+            gap: .55rem;
+            justify-content: center;
+            min-height: 6px;
+            min-width: 18px;
+            padding: .55rem 1rem;
             transition: background .16s ease, border-color .16s ease;
         }
-        .navbar-logout:hover,
-        .navbar-logout:focus-visible {
-            background: rgba(255, 255, 255, .16);
-            border-color: rgba(255, 255, 255, .5);
+        .navbar-account-toggle:hover,
+        .navbar-account-toggle:focus-visible,
+        .navbar-account-toggle[aria-expanded="true"] {
+            background: rgba(255, 255, 255, .08);
+            border-color: #fff;
             color: #fff;
         }
+        .navbar-account-icon { flex: 0 0 auto; }
+        .navbar-account-chevron { flex: 0 0 auto; transition: transform .16s ease; }
+        .navbar-account-toggle[aria-expanded="true"] .navbar-account-chevron { transform: rotate(180deg); }
+        .navbar-account-menu {
+            border: 1px solid #dfe7eb;
+            border-radius: 12px;
+            box-shadow: 0 14px 36px rgba(9, 43, 70, .16);
+            min-width: 220px;
+            padding: .5rem;
+        }
+        .navbar-account-details {
+            border-bottom: 1px solid #e8eef0;
+            display: grid;
+            gap: .15rem;
+            margin-bottom: .35rem;
+            padding: .55rem .7rem .75rem;
+        }
+        .navbar-account-details span { color: #657983; font-size: .75rem; }
+        .navbar-account-details strong { color: #173747; font-size: .9rem; }
+        .navbar-account-menu .dropdown-item { border-radius: 7px; padding: .55rem .7rem; }
+        .navbar-account-logout { margin: 0; }
+        .navbar-account-logout button {
+            background: none;
+            border: 0;
+            color: #294653;
+            text-align: left;
+            width: 100%;
+        }
+        .navbar-account-logout button:hover,
+        .navbar-account-logout button:focus-visible { background: #f2f5f7; }
         .navbar-notifications { position: relative; }
         .navbar-notifications-toggle {
             align-items: center;
@@ -281,7 +457,7 @@
             text-decoration: none;
         }
         @media (max-width: 991.98px) {
-            .navbar-logout { margin: .4rem 0; }
+            .navbar-account-toggle { justify-content: flex-start; margin: .25rem 0; min-height: 48px; }
         }
         .card {
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); /* Soft shadow for cards */
@@ -303,15 +479,6 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     {% if user.is_authenticated %}
-                        <!-- Show User Info and Logout -->
-                        <li class="nav-item">
-                            <span class="navbar-user">
-                                <strong>{{ user.username }}</strong> 
-                                {% if user.profile.role %}
-                                        <span>({{ user.profile.role }})</span>
-                                {% endif %}
-                            </span>
-                        </li>
                         <li class="nav-item dropdown navbar-notifications">
                             <button
                                 class="navbar-notifications-toggle dropdown-toggle"
@@ -352,14 +519,35 @@
                                 <a class="navbar-notification-all" href="{% url 'notifications' %}">View all notifications</a>
                             </div>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'profile' %}">My Profile</a>
-                        </li>
-                        <li class="nav-item">
-                            <form action="{% url 'logout' %}" method="post">
-                                {% csrf_token %}
-                                <button class="navbar-logout" type="submit">Log out</button>
-                            </form>
+                        <li class="nav-item dropdown navbar-account">
+                            <button
+                                class="navbar-account-toggle"
+                                type="button"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                aria-label="Account menu for {{ user.username }}"
+                            >
+                                <svg class="navbar-account-icon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <circle cx="12" cy="12" r="10.5" stroke="currentColor" stroke-width="1.5"/>
+                                    <circle cx="12" cy="8.5" r="3" stroke="currentColor" stroke-width="1.5"/>
+                                    <path d="M5.8 19c.9-3 3.1-4.5 6.2-4.5s5.3 1.5 6.2 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                                </svg>
+                                <span>{{ user.get_short_name|default:user.username }}</span>
+                                <svg class="navbar-account-chevron" aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                    <path d="m3 6 5 5 5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end navbar-account-menu">
+                                <div class="navbar-account-details">
+                                    <span>Staff ID</span>
+                                    <strong>{{ user.username }}</strong>
+                                </div>
+                                <a class="dropdown-item" href="{% url 'profile' %}">My Profile</a>
+                                <form class="navbar-account-logout" action="{% url 'logout' %}" method="post">
+                                    {% csrf_token %}
+                                    <button class="dropdown-item" type="submit">Log out</button>
+                                </form>
+                            </div>
                         </li>
                     {% else %}
                         <li class="nav-item">
@@ -368,6 +556,7 @@
                     {% endif %}
                 </ul>
             </div>
+
         </div>
     </nav>
 
@@ -563,9 +752,24 @@
         document.querySelectorAll('.role-dashboard-shell').forEach((shell) => {
             const sidebar = shell.querySelector('.role-dashboard-sidebar');
             const toggle = shell.querySelector('.role-sidebar-toggle');
+            const navigation = shell.querySelector('.role-sidebar-nav');
+            const closeButton = shell.querySelector('[data-sidebar-close]');
+            const backdrop = shell.querySelector('.role-sidebar-backdrop');
             const buttons = [...shell.querySelectorAll('[data-role-section-target]')];
             const sections = [...shell.querySelectorAll('[data-role-section]')];
             if (!sidebar || !buttons.length || !sections.length) return;
+
+            function syncNavigationState() {
+                const mobile = window.matchMedia('(max-width: 767.98px)').matches;
+                const expanded = mobile && sidebar.classList.contains('is-expanded');
+                if (toggle) toggle.setAttribute('aria-expanded', String(expanded));
+                if (toggle) toggle.setAttribute('aria-label', expanded ? 'Close menu' : 'Open menu');
+                if (backdrop) backdrop.hidden = !expanded;
+                if (navigation) {
+                    navigation.inert = mobile && !expanded;
+                    navigation.setAttribute('aria-hidden', String(mobile && !expanded));
+                }
+            }
 
             function showSection(name, updateHistory) {
                 const target = sections.find((section) => section.dataset.roleSection === name);
@@ -578,20 +782,38 @@
                 });
                 if (window.matchMedia('(max-width: 767.98px)').matches && sidebar.classList.contains('is-expanded')) {
                     sidebar.classList.remove('is-expanded');
-                    toggle?.setAttribute('aria-expanded', 'false');
+                    syncNavigationState();
                 }
                 if (updateHistory) window.history.pushState(null, '', `#${name}`);
             }
 
             toggle?.addEventListener('click', () => {
-                const expanded = sidebar.classList.toggle('is-expanded');
-                toggle.setAttribute('aria-expanded', String(expanded));
+                sidebar.classList.toggle('is-expanded');
+                syncNavigationState();
             });
+            backdrop?.addEventListener('click', () => {
+                sidebar.classList.remove('is-expanded');
+                syncNavigationState();
+            });
+            closeButton?.addEventListener('click', () => {
+                sidebar.classList.remove('is-expanded');
+                syncNavigationState();
+                toggle?.focus();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && sidebar.classList.contains('is-expanded')) {
+                    sidebar.classList.remove('is-expanded');
+                    syncNavigationState();
+                    toggle?.focus();
+                }
+            });
+            window.addEventListener('resize', syncNavigationState);
             buttons.forEach((button) => {
                 button.addEventListener('click', () => showSection(button.dataset.roleSectionTarget, true));
             });
             const defaultSection = sidebar.dataset.defaultSection || sections[0].dataset.roleSection;
             window.addEventListener('popstate', () => showSection(window.location.hash.slice(1) || defaultSection, false));
+            syncNavigationState();
             showSection(window.location.hash.slice(1) || defaultSection, false);
         });
     </script>

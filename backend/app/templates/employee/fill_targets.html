@@ -346,6 +346,7 @@
         padding-top: 1rem;
     }
     .appraisal-navigation-group { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .appraisal-mobile-field-label { display: none; }
     .appraisal-button-primary {
         background: var(--form-rust);
         border: 1px solid var(--form-rust);
@@ -390,13 +391,82 @@
     .appraisal-confirmation h2 { font-size: 1.2rem; font-weight: 750; }
     .appraisal-js .appraisal-step-panel:not(.is-active) { display: none; }
     @media (max-width: 640px) {
-        .appraisal-document { padding: .65rem; }
+        .appraisal-form-page {
+            margin: .5rem auto 1.25rem;
+            padding: 0 .35rem;
+        }
+        .appraisal-document { padding: .4rem; }
         .appraisal-document-header { grid-template-columns: 52px minmax(0, 1fr) 52px; gap: .35rem; }
         .appraisal-document-header img { max-height: 58px; width: 52px; }
         .appraisal-document-header h1 { font-size: .93rem; }
         .appraisal-document-header p { font-size: .65rem; }
         .appraisal-document-header .appraisal-document-subtitle { font-size: .58rem; }
         .appraisal-confidential { font-size: .64rem; }
+        .appraisal-section { margin-bottom: .6rem; }
+        .appraisal-section-heading { font-size: .9rem; padding: .5rem .6rem; }
+        .appraisal-section-body { padding: .55rem; }
+        .appraisal-section-intro { margin-bottom: .6rem; }
+        .appraisal-period { gap: .3rem .5rem; padding: .5rem .55rem; }
+        .appraisal-period-label { font-size: .68rem; padding: .4rem .5rem; }
+        .appraisal-fields-grid { gap: .55rem; }
+        .appraisal-field label { font-size: .8rem; margin-bottom: .2rem; }
+        .appraisal-field input,
+        .appraisal-field select,
+        .appraisal-field textarea,
+        .appraisal-table input,
+        .appraisal-table select,
+        .appraisal-table textarea {
+            font-size: .82rem;
+            padding: .4rem .45rem;
+        }
+        .appraisal-field textarea,
+        .appraisal-table textarea { min-height: 64px; }
+        .appraisal-table:not(.appraisal-target-entry-table) { min-width: 600px; }
+        .appraisal-target-entry-table {
+            border: 0;
+            display: block;
+            min-width: 0;
+            width: 100%;
+        }
+        .appraisal-target-entry-table thead {
+            height: 1px;
+            overflow: hidden;
+            position: absolute;
+            width: 1px;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+        }
+        .appraisal-target-entry-table tbody,
+        .appraisal-target-entry-table tr {
+            display: block;
+            width: 100%;
+        }
+        .appraisal-target-entry-table tr {
+            border: 1px solid #b8a69e;
+            margin-bottom: .5rem;
+            padding: .25rem;
+        }
+        .appraisal-target-entry-table td {
+            border: 0;
+            display: block;
+            padding: .3rem;
+            width: 100%;
+        }
+        .appraisal-target-entry-table .appraisal-row-number {
+            background: #f8f3f0;
+            border-radius: 3px;
+            display: inline-block;
+            margin: 0 0 .2rem .3rem;
+            padding: .1rem .4rem;
+            width: auto;
+        }
+        .appraisal-mobile-field-label {
+            color: #555;
+            display: block;
+            font-size: .73rem;
+            font-weight: 700;
+            margin-bottom: .15rem;
+        }
         .appraisal-step-list {
             display: flex;
             gap: .4rem;
@@ -407,33 +477,184 @@
         .appraisal-step-list li { flex: 1 0 135px; scroll-snap-align: start; }
         .appraisal-fields-grid,
         .appraisal-competency-grid { grid-template-columns: minmax(0, 1fr); }
-        .appraisal-navigation { align-items: stretch; }
-        .appraisal-navigation-group { width: 100%; }
-        .appraisal-navigation .btn { flex: 1 1 auto; }
+        .appraisal-navigation {
+            align-items: center;
+            flex-wrap: nowrap;
+            gap: .3rem;
+            justify-content: space-between;
+            margin-top: .65rem;
+            padding-top: .65rem;
+        }
+        .appraisal-navigation-group {
+            align-items: center;
+            flex: 0 1 auto;
+            flex-wrap: nowrap;
+            gap: .3rem;
+            width: auto;
+        }
+        .appraisal-navigation .btn {
+            flex: 0 1 auto;
+            font-size: .74rem;
+            line-height: 1.2;
+            min-width: 0;
+            padding: .38rem .48rem;
+            white-space: nowrap;
+        }
+        .appraisal-navigation-group > span { font-size: .68rem; white-space: nowrap; }
+        .appraisal-stepper { margin-bottom: .7rem; padding: .75rem; }
+        .appraisal-help { font-size: .8rem; margin-bottom: .55rem; }
+        .appraisal-competency-category { margin-top: .65rem; padding: .6rem; }
+        .appraisal-competency-card { padding: .65rem; }
+        .appraisal-competency-statement { gap: .4rem; margin-top: .45rem; }
+        .appraisal-readonly-card { margin: .55rem 0; padding: .65rem; }
     }
     @media print {
+        @page { size: A4 portrait; margin: 10mm; }
+        @page appraisal-planning-landscape {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+        @page appraisal-review-landscape {
+            size: A4 landscape;
+            margin: 10mm;
+        }
+        .appraisal-print-mode .appraisal-planning-paper,
+        .appraisal-print-mode .appraisal-midyear-paper,
+        .appraisal-print-mode .appraisal-endyear-paper {
+            page: appraisal-review-landscape;
+            break-before: page;
+            break-after: page;
+            page-break-before: always;
+            page-break-after: always;
+        }
+        .appraisal-print-mode .appraisal-planning-paper,
+        .appraisal-print-mode .appraisal-endyear-paper {
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+        }
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table {
+            min-width: 0 !important;
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table th,
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table td {
+            overflow-wrap: break-word !important;
+            padding: 5pt !important;
+            word-break: normal !important;
+        } 
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table th:nth-child(1),
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table td:nth-child(1) { width: 5%; }
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table th:nth-child(2),
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table td:nth-child(2) { width: 18%; }
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table th:nth-child(3),
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table td:nth-child(3) { width: 47%; }
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table th:nth-child(4),
+        .appraisal-print-mode .appraisal-planning-paper .appraisal-target-review-table td:nth-child(4) { width: 30%; }
+        .appraisal-print-mode .appraisal-midyear-paper .table,
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table {
+            min-width: 0 !important;
+            table-layout: fixed !important;
+            width: 100% !important;
+        }
+        .appraisal-print-mode .appraisal-midyear-paper .table th,
+        .appraisal-print-mode .appraisal-midyear-paper .table td,
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th,
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td {
+            font-size: 10pt !important;
+            overflow-wrap: break-word !important;
+            padding: 4pt !important;
+            word-break: normal !important;
+        }  
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type th:nth-child(1),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type td:nth-child(1) { width: 5%; }
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type th:nth-child(2),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type td:nth-child(2) { width: 55%; }
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type th:nth-child(3),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type td:nth-child(3),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type th:nth-child(4),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:first-of-type td:nth-child(4) { width: 20%; }
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type th:first-child,
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type td:first-child { width: 60%; }
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type th:nth-child(2),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type td:nth-child(2),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type th:nth-child(3),
+        .appraisal-print-mode .appraisal-midyear-paper .table-responsive:last-of-type td:nth-child(3) { width: 20%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(1),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(1) { width: 4%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(2),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(2) { width: 30%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(3),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(3) { width: 23%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(4),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(4) { width: 12%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(5),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(5) { width: 10%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table th:nth-child(6),
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-target-review-table td:nth-child(6) { width: 21%; }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-results-lines {
+            font-size: 8pt;
+            margin-top: 6pt;
+        }
+        .appraisal-print-mode .appraisal-endyear-paper .appraisal-results-lines p {
+            grid-template-columns: minmax(0, 1fr) 12px 90px;
+            margin-bottom: 3pt;
+        }
+        .appraisal-print-mode .appraisal-section-heading,
+        .appraisal-print-mode .appraisal-section-title {
+            -webkit-print-color-adjust: exact !important;
+            background-color: #a43a10 !important;
+            color: #fff !important;
+            print-color-adjust: exact !important;
+        }
         body { background: #fff !important; }
         body > nav,
         .no-print,
         .messages { display: none !important; }
         .appraisal-form-page { margin: 0 !important; max-width: none !important; padding: 0 !important; }
         .appraisal-document { border: 0; box-shadow: none; padding: 0; }
+        .appraisal-page-title,
         .appraisal-stepper { display: none !important; }
         .appraisal-section,
-        .appraisal-paper { break-inside: avoid; box-shadow: none !important; }
-        .appraisal-readonly-card { break-inside: avoid; }
+        .appraisal-paper {
+            break-inside: avoid !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            page-break-inside: avoid !important;
+        }
+        .appraisal-section-heading { break-after: avoid; page-break-after: avoid; }
+        .appraisal-readonly-card,
+        .appraisal-table tr { break-inside: avoid; page-break-inside: avoid; }
+        .table-responsive {
+            overflow: visible !important;
+            width: 100% !important;
+        }
+        .appraisal-table {
+            min-width: 0 !important;
+            table-layout: auto !important;
+            width: 100% !important;
+        }
+        .appraisal-table th,
+        .appraisal-table td {
+            font-size: 8pt !important;
+            overflow-wrap: anywhere;
+            white-space: normal !important;
+        }
     }
 </style>
 
 <main class="appraisal-form-page{% if print_mode %} appraisal-print-mode{% endif %}">
-    {% if not print_mode %}
-        <div class="appraisal-toolbar no-print">
-            <a href="{% url 'employee_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+    <div class="appraisal-toolbar no-print">
+        {% if print_mode %}
+            <a href="{% url 'employee_appraisal_detail' appraisal.id %}" class="btn btn-outline-secondary">Back to appraisal</a>
+            <button type="button" class="btn appraisal-button-primary" onclick="window.print()">Download / Save as PDF</button>
+        {% else %}
+            <a href="{% url dashboard_url_name %}" class="btn btn-outline-secondary">Dashboard</a>
             {% if read_only and allow_pdf and appraisal.status == 'completed' %}
-                <a href="{% url 'employee_appraisal_pdf' appraisal.id %}" class="btn btn-outline-primary">Print appraisal</a>
+                <a href="{% url 'employee_appraisal_pdf' appraisal.id %}" class="btn btn-outline-primary">Open PDF / Print view</a>
             {% endif %}
-        </div>
-    {% endif %}
+        {% endif %}
+    </div>
 
     <article class="appraisal-document">
         <header class="appraisal-document-header">
@@ -449,14 +670,20 @@
 
             <div class="appraisal-page-title">
                 <!-- <h2>My Appraisal — {{ appraisal.cycle.year }}</h2> -->
-                <span class="appraisal-status ">Status: {{ appraisal.get_status_display }}</span>
+                <span class="appraisal-status">
+                    Status:
+                    {% if appraisal.status == 'pending_manager' %}Supervisor Review
+                    {% elif appraisal.status == 'pending_hod' %}HOD Review
+                    {% elif appraisal.status == 'pending_hr' %}HR Review
+                    {% else %}{{ appraisal.get_status_display }}{% endif %}
+                </span>
             </div>
 
         {% if not read_only %}
             <nav class="appraisal-stepper no-print" aria-label="Appraisal form progress">
                 <div class="appraisal-stepper-header">
                     <h2 class="appraisal-stepper-title">Appraisal stages</h2>
-                    <span class="appraisal-stepper-count"><strong data-step-count>1</strong> / 5 steps</span>
+                    <span class="appraisal-stepper-count"><strong data-step-count>1</strong> / 5 pages</span>
                 </div>
                 <div class="appraisal-stepper-overall">
                     <div class="appraisal-stepper-overall-label">
@@ -530,7 +757,7 @@
             </nav>
         {% endif %}
 
-        {% if return_history %}
+        {% if return_history and not print_mode %}
             <section class="appraisal-section">
                 <h2 class="appraisal-section-heading">Return history and required corrections</h2>
                 <div class="appraisal-section-body">
@@ -547,136 +774,24 @@
 
         {% if read_only %}
             {% include 'appraisal/_employee_details.html' %}
-            {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
-
-            <section class="appraisal-section">
-                <h2 class="appraisal-section-heading">SECTION 2: Performance Planning Form and Review</h2>
-                <div class="appraisal-section-body">
-                    <p class="appraisal-section-intro">Agreed key result areas, targets, resources and reviewer assessments.</p>
-                    <div class="table-responsive">
-                        <table class="table table-bordered align-middle appraisal-table">
-                            <thead>
-                                <tr>
-                                    <th>No.</th>
-                                    <th>Key result area</th>
-                                    <th>Target</th>
-                                    <th>Resources required</th>
-                                    <th>Mid-year progress / remarks</th>
-                                    <th>End-year assessment / score</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for target in targets %}
-                                    <tr>
-                                        <td class="appraisal-row-number">{{ forloop.counter }}</td>
-                                        <td>{{ target.key_result_area }}</td>
-                                        <td>{{ target.target_description|default:"Not provided" }}</td>
-                                        <td>{{ target.resources_required|default:"Not provided" }}</td>
-                                        <td>{{ target.get_mid_year_progress_display|default:"Not reviewed yet" }}<br>{{ target.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
-                                        <td>{{ target.get_end_year_assessment_display|default:"Not reviewed yet" }}<br><strong>End-year score:</strong> {{ target.end_year_score|default:"Not scored yet" }}<br>{{ target.get_end_year_comment_display|default:"Not reviewed yet" }}</td>
-                                    </tr>
-                                {% empty %}
-                                    <tr><td colspan="6" class="text-center text-muted">No targets have been added to this appraisal.</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
-            <section class="appraisal-section">
-                <h2 class="appraisal-section-heading">SECTION 5: Annual Appraisal — Competencies</h2>
-                <div class="appraisal-section-body">
-                    {% for group in score_breakdown.groups %}
-                        {% with score=group.score %}
-                            <div class="appraisal-readonly-card">
-                                <div class="d-flex flex-wrap justify-content-between gap-2">
-                                    <h3>{{ score.competency.name }}</h3>
-                                    <span class="badge text-bg-light">{{ score.competency.get_competency_type_display }}</span>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-bordered align-middle appraisal-table">
-                                        <thead>
-                                            <tr><th>Selected statement</th><th>Weight</th><th>End-year score (1–5)</th><th>W × G</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for statement in group.statements %}
-                                                <tr>
-                                                    <td>{{ statement.statement }}</td>
-                                                    <td>{{ group.weight|floatformat:"1" }}</td>
-                                                    <td><strong>End-year score:</strong> {{ statement.score|default:"Not scored yet" }}</td>
-                                                    <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
-                                                </tr>
-                                            {% empty %}
-                                                <tr><td colspan="4">{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td></tr>
-                                            {% endfor %}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr><th colspan="3">Group total</th><td>{{ group.total|floatformat:2|default_if_none:"Pending" }}</td></tr>
-                                            <tr><th colspan="3">Group average</th><td>{{ group.average|floatformat:2|default_if_none:"Pending" }}</td></tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                                {% if group.legacy %}
-                                    <div class="text-muted">{% include 'appraisal/_competency_description.html' with competency=group.competency %}</div>
-                                {% endif %}
-                                <p class="mb-0 mt-2"><strong>Mid-year:</strong> {{ score.get_mid_year_progress_display|default:"Not reviewed yet" }} — {{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</p>
-                            </div>
-                        {% endwith %}
-                    {% empty %}
-                        <p class="mb-0">No competency reviews have been added to this appraisal.</p>
-                    {% endfor %}
-                </div>
-            </section>
-
             {% include 'appraisal/_training.html' %}
+            {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
+            {% include 'appraisal/_guidance_notes.html' %}
+            {% include 'appraisal/_targets_readonly.html' %}
+            {% include 'appraisal/_midyear_endyear_readonly.html' %}
+            {% include 'appraisal/_competencies_readonly.html' %}
+            {% include 'appraisal/_annual_appraisal_results.html' %}
 
-            <section class="appraisal-section">
-                <h2 class="appraisal-section-heading">Sections 6–10: Comments and assessment</h2>
+            {% include 'appraisal/_appraisal_comment_sections.html' %}
+            {% include 'appraisal/_hod_comment_section.html' %}
+            <section class="appraisal-paper" aria-labelledby="final-hr-approval-heading">
+                <h2 class="appraisal-section-title" id="final-hr-approval-heading">Final HR Approval</h2>
                 <div class="appraisal-section-body">
-                    <div class="appraisal-readonly-card">
-                        <h3>Appraisee’s comments on overall assessment</h3>
-                        <p>{{ appraisal.employee_comments|default:"No comments provided." }}</p>
-                    </div>
-                    <div class="appraisal-readonly-card">
-                        <h3>Appraiser’s comments on work plan achievements</h3>
-                        <p>{{ appraisal.supervisor_comments|default:"No comments yet." }}</p>
-                    </div>
-                    <div class="appraisal-readonly-card">
-                        <h3>Career development plan</h3>
-                        <p>{{ appraisal.career_development_plan|default:"No plan recorded." }}</p>
-                    </div>
-                    <div class="appraisal-readonly-card">
-                        <h3>Assessment decision</h3>
-                        <p>{{ appraisal.get_assessment_decision_display|default:"Not determined yet" }}</p>
-                    </div>
-                    <div class="appraisal-readonly-card">
-                        <h3>Head of Department’s comments</h3>
-                        <p>{{ appraisal.hod_comments|default:"No comments yet." }}</p>
-                    </div>
-                    <div class="appraisal-readonly-card">
-                        <h3>HR comments and final result</h3>
-                        <p><strong>Comments:</strong> {{ appraisal.hr_comments|default:"No comments yet." }}</p>
-                        <p class="mb-0"><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
-                    </div>
+                    <div class="appraisal-comment-box">{{ appraisal.hr_comments|default:"No comments yet."|linebreaksbr }}</div>
+                    <p class="appraisal-final-rating"><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined yet" }}</p>
                 </div>
             </section>
 
-            <section class="appraisal-section">
-                <h2 class="appraisal-section-heading">Overall Score Calculation</h2>
-                <div class="appraisal-section-body appraisal-results-lines">
-                    <p><strong>Q — Total target scores:</strong><span>=</span><span>{{ score_breakdown.target_total|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p><strong>A — Target average (Q ÷ number of targets):</strong><span>=</span><span>{{ score_breakdown.target_average|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p><strong>M — A × 0.6:</strong><span>=</span><span>{{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p><strong>N — Average of core competency group averages:</strong><span>=</span><span>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p><strong>O — Average of non-core competency group averages:</strong><span>=</span><span>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p><strong>T — M + N + O:</strong><span>=</span><span>{{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</span></p>
-                    <p class="mb-0"><strong>Overall percentage — T ÷ 5 × 100:</strong><span>=</span><span>{% if score_breakdown.percentage is not None %}{{ score_breakdown.percentage|floatformat:2 }}%{% else %}Pending scores{% endif %}</span></p>
-                    {% if not score_breakdown.complete %}
-                        <small class="text-muted d-block mt-3">The final total appears once all targets and selected competency statements are scored.</small>
-                    {% endif %}
-                </div>
-            </section>
         {% else %}
             <form method="post" action="{{ cycle_fill_url }}" id="employee-appraisal-form">
                 {% csrf_token %}
@@ -736,6 +851,7 @@
                         </div>
                     </div>
                     {% include 'appraisal/_supervisor_details.html' with supervisor=assigned_supervisor %}
+                    {% include 'appraisal/_guidance_notes.html' %}
                     <div class="appraisal-navigation no-print">
                         <span class="text-muted small">Step 1 of 5</span>
                         <button type="submit" name="action" value="save_personal" class="btn appraisal-button-primary">Save and continue</button>
@@ -750,7 +866,7 @@
                             {% if formset.non_form_errors %}<div class="alert alert-danger">{{ formset.non_form_errors }}</div>{% endif %}
                             {{ formset.management_form }}
                             <div class="table-responsive">
-                                <table class="table table-bordered align-middle appraisal-table">
+                                <table class="table table-bordered align-middle appraisal-table appraisal-target-entry-table">
                                     <thead>
                                         <tr>
                                             <th>No.</th>
@@ -767,14 +883,17 @@
                                                     {{ forloop.counter }}
                                                 </td>
                                                 <td>
+                                                    <span class="appraisal-mobile-field-label">Key result area</span>
                                                     {{ form.key_result_area }}
                                                     {% for error in form.key_result_area.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                                                 </td>
                                                 <td>
+                                                    <span class="appraisal-mobile-field-label">Target</span>
                                                     {{ form.target_description }}
                                                     {% for error in form.target_description.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                                                 </td>
                                                 <td>
+                                                    <span class="appraisal-mobile-field-label">Resources required</span>
                                                     {{ form.resources_required }}
                                                     {% for error in form.resources_required.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                                                 </td>

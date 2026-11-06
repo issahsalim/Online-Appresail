@@ -486,16 +486,22 @@
     </style> 
 
     <aside class="role-dashboard-sidebar" aria-label="Employee dashboard navigation">
-        <!-- <div class="role-sidebar-brand">
+        <button class="role-sidebar-toggle" type="button" aria-controls="employee-dashboard-navigation" aria-expanded="false" aria-label="Open menu">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <div class="role-sidebar-brand">
             <span class="role-sidebar-mark" aria-hidden="true">✚</span>
             <span>Staff Appraisal<br><small class="fw-normal opacity-75">EMPLOYEE WORKSPACE</small></span>
-            <button class="role-sidebar-toggle" type="button" aria-controls="employee-dashboard-navigation" aria-expanded="false">
-                <span aria-hidden="true">☰</span> Menu
-            </button>
-        </div>  -->
+        </div>
 
         <div class="role-sidebar-label">Workspace</div>
+        <button class="role-sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
         <nav class="role-sidebar-nav" id="employee-dashboard-navigation">
+            <div class="role-sidebar-drawer-brand">
+                <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+                <span class="role-sidebar-drawer-copy">Mathias Catholic Hospital<small>EMPLOYEE WORKSPACE</small></span>
+                <button class="role-sidebar-close" type="button" aria-label="Close menu" data-sidebar-close>×</button>
+            </div>
             <button class="role-sidebar-link active" type="button" data-role-section-target="active">
                 <span class="role-sidebar-icon" aria-hidden="true">◷</span>
                 <span class="role-sidebar-link-copy">
@@ -670,7 +676,7 @@
         <div class="employee-workspace-heading">
             <div>
                 <h2>My Appraisal History</h2>
-                <p>Track your past evaluations, final scores, and completed appraisal records.</p>
+                <p>Edit drafts or returned appraisals from any cycle, and track submitted and completed records.</p>
             </div>
             <span class="employee-history-count">{{ all_appraisals|length }} record{{ all_appraisals|length|pluralize }}</span>
         </div>
@@ -738,13 +744,15 @@
                                     </td>
                                     <td style="text-align: right;">
                                         <div style="display: inline-flex; gap: .4rem; justify-content: flex-end;">
-                                            {% if item.status in 'draft,returned_employee' and item.cycle.is_active %}
-                                                <a href="{% url 'fill_targets_year' item.cycle.year %}" class="btn btn-sm btn-outline-primary">Edit Goals</a>
+                                            {% if item.status == 'draft' or item.status == 'returned_employee' %}
+                                                <a href="{% url 'fill_targets_year' item.cycle.year %}" class="btn btn-sm btn-outline-primary">
+                                                    {% if item.status == 'returned_employee' %}Review and resubmit{% else %}Edit goals{% endif %}
+                                                </a>
                                             {% else %}
                                                 <a href="{% url 'employee_appraisal_detail' item.id %}" class="btn btn-sm btn-outline-secondary">View</a>
                                             {% endif %}
                                             {% if item.status == 'completed' %}
-                                                <a href="{% url 'employee_appraisal_pdf' item.id %}" class="btn btn-sm btn-outline-dark" title="Download / Print PDF">PDF</a>
+                                                <a href="{% url 'employee_appraisal_pdf' item.id %}" class="btn btn-sm btn-outline-dark" title="Download / Print PDF">Print</a>
                                             {% endif %}
                                         </div>
                                     </td>

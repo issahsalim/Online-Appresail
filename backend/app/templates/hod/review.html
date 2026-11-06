@@ -56,9 +56,10 @@
             padding: .6rem .95rem;
         }
         .hod-review-page .btn-success { background: #26845b; border-color: #26845b; }
-        .hod-review-page .btn-warning { background: #f2c45c; border-color: #e5b747; color: #3e3215; }
-        .hod-review-page .return-review-form { border-color: #e4c982 !important; }
-        .hod-review-page .return-review-form > .card-header { background: #fbf5e7; border-left: 4px solid #d49b18; }
+        .hod-review-page .return-review-form { border-color: #a43a10 !important; }
+        .hod-review-page .return-review-form > .card-header { background: #a43a10; border-left: 0; color: #fff; }
+        .hod-review-page .return-review-form .btn-primary { background: #a43a10; border-color: #a43a10; }
+        .hod-review-page .return-review-form .btn-primary:hover { background: #852e0b; border-color: #852e0b; }
         @media (max-width: 575.98px) {
             .hod-review-page .card-body { padding: .9rem; }
             .hod-review-page button { width: 100%; }
@@ -70,8 +71,9 @@
         <p>Supervisor: {{ appraisal.supervisor.user.username }} <span aria-hidden="true">·</span> Review the supervisor’s scores and comments before approving.</p>
     </header>
     {% include 'appraisal/_employee_details.html' %}
-    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
     {% include 'appraisal/_training.html' %}
+    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
+    {% include 'appraisal/_guidance_notes.html' %}
 
     {% if return_history %}
         <div class="card mb-4 border-warning">
@@ -89,6 +91,7 @@
     {% endif %}
 
     {% include 'appraisal/_targets_readonly.html' %}
+    {% include 'appraisal/_midyear_endyear_readonly.html' %}
     {% include 'appraisal/_competencies_readonly.html' %}
     {% include 'appraisal/_annual_appraisal_results.html' %}
     {% include 'appraisal/_appraisal_comment_sections.html' %}
@@ -117,14 +120,14 @@
         </form>
     </section>
 
-        <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 border-warning return-review-form">
+        <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 return-review-form">
             {% csrf_token %}
-            <div class="card-header bg-warning">Return to Supervisor for Reassessment</div>
+            <div class="card-header">Return to Supervisor for Reassessment</div>
             <div class="card-body">
                 {{ return_form.comment.label_tag }}
                 {{ return_form.comment }}
                 {{ return_form.comment.errors }}
-                <button type="submit" class="btn btn-warning mt-3">Return to Supervisor</button>
+                <button type="submit" class="btn btn-primary mt-3">Return to Supervisor</button>
             </div>
         </form>
 </div>

@@ -5,7 +5,8 @@ from django.contrib.auth.models import User
 from .models import (
     Department, 
     EmployeeProfile, 
-    AssignSupervisor, 
+    DepartmentSupervisor,
+    SupervisorReporting,
     AssignDepartmentHod,
     AppraisalCycle,
     Competency,
@@ -15,6 +16,7 @@ from .models import (
     AppraisalTarget,
     AppraisalCompetencyScore,
     AppraisalCompetencyStatementScore,
+    AuditLog,
 )
 
 # ==========================================
@@ -73,30 +75,30 @@ class EmployeeProfileAdmin(admin.ModelAdmin):
 # 2. ASSIGNMENT TABLES (Department Filtering)
 # ==========================================
 
-@admin.register(AssignSupervisor)
-class AssignSupervisorAdmin(admin.ModelAdmin):
-    autocomplete_fields = ['employee', 'supervisor']
-    list_display = ('department', 'employee', 'supervisor')
+@admin.register(DepartmentSupervisor)
+class DepartmentSupervisorAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['supervisor']
+    list_display = ('department', 'supervisor')
     list_filter = ('department',)
 
-    # THE MAGIC: This filters the dropdowns based on the department selected
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "employee":
-            # If the form has a department selected, only show employees in that dept
+        if db_field.name == 'supervisor':
+            queryset = EmployeeProfile.objects.exclude(role='HR')
             department_id = request.GET.get('department')
             if department_id:
-                kwargs["queryset"] = EmployeeProfile.objects.filter(
-                    role__in=['Employee', 'Supervisor'],
-                    department_id=department_id
-                )
-        elif db_field.name == "supervisor":
-            department_id = request.GET.get('department')
-            if department_id:
-                kwargs["queryset"] = EmployeeProfile.objects.filter(
-                    role='Supervisor', 
-                    department_id=department_id
-                )
+                queryset = queryset.filter(department_id=department_id)
+            kwargs["queryset"] = queryset
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+@admin.register(SupervisorReporting)
+class SupervisorReportingAdmin(admin.ModelAdmin):
+    autocomplete_fields = ['supervisor', 'manager']
+    list_display = ('supervisor', 'manager')
+    search_fields = (
+        'supervisor__user__username',
+        'manager__user__username',
+    )
 
 @admin.register(AssignDepartmentHod)
 class AssignDepartmentHodAdmin(admin.ModelAdmin):
@@ -116,9 +118,11 @@ class AppraisalCycleAdmin(admin.ModelAdmin):
 
 @admin.register(Competency)
 class CompetencyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'competency_type')
+    list_display = ('name', 'competency_type', 'display_order')
+    list_editable = ('display_order',)
     list_filter = ('competency_type',)
     search_fields = ('name',)
+    ordering = ('competency_type', 'display_order', 'name')
 
 
 # ==========================================
@@ -249,4 +253,38 @@ class AppraisalAdmin(admin.ModelAdmin):
         if obj and obj.status == 'completed' and not request.user.is_superuser:
             return [f.name for f in self.model._meta.fields]
         return super().get_readonly_fields(request, obj)
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = (
+        'created_at',
+        'actor_username',
+        'actor_role',
+        'action',
+        'model_name',
+        'object_id',
+        'note',
+        'ip_address',
+        'actor_is_superuser',
+    )
+    list_filter = ('action', 'model_name', 'actor_is_superuser', 'created_at')
+    search_fields = ('actor_username', 'model_name', 'object_id', 'object_label')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at', '-pk')
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def get_readonly_fields(self, request, obj=None):
+        return [field.name for field in self.model._meta.fields]
+
+    def has_delete_permission(self, request, obj=None):
+        return False
         

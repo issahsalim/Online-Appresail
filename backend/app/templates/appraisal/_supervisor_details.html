@@ -1,19 +1,14 @@
 <section class="appraisal-paper" aria-labelledby="appraiser-information-readonly-heading">
-    <h2 class="appraisal-section-title" id="appraiser-information-readonly-heading">Supervisor details</h2>
+    <h2 class="appraisal-section-title" id="appraiser-information-readonly-heading">SECTION 1 - B: Appraiser’s Information</h2>
     <div class="appraisal-section-body">
         {% if supervisor %}
             <div class="appraisal-fields">
                 <div class="appraisal-field">
                     <strong>Name:</strong>
-                    {% if supervisor.title %}
-                        {{ supervisor.get_title_display }}
-                        {% if supervisor.title == 'other' and supervisor.other_title %}({{ supervisor.other_title }}){% endif %}
-                    {% endif %}
                     {{ supervisor.user.get_full_name|default:supervisor.user.username }}
                     {% if supervisor.other_names %} {{ supervisor.other_names }}{% endif %}
                 </div>
-                <div class="appraisal-field"><strong>Staff ID:</strong> {{ supervisor.user.username }}</div>
-                <div class="appraisal-field"><strong>Job title:</strong> {{ supervisor.job_title|default:"—" }}</div>
+                <div class="appraisal-field"><strong>Position:</strong> {{ supervisor.job_title|default:"—" }}</div>
                 <div class="appraisal-field"><strong>Email:</strong> {{ supervisor.user.email|default:"—" }}</div>
             </div>
         {% else %}

@@ -37,6 +37,7 @@ urlpatterns = [
     path('hod/view/<int:appraisal_id>/', views.hod_view_appraisal, name='hod_view_appraisal'),
 
         path('hr/dashboard/', views.hr_dashboard, name='hr_dashboard'),
+        path('hr/audit/', views.audit_log, name='audit_log'),
         path('hr/supervisor-assignments/', views.hr_supervisor_assignments, name='hr_supervisor_assignments'),
         path('hr/supervisor-assignment-options/', views.hr_assignment_options, name='hr_assignment_options'),
         path('hr/supervisor-assignments/search/', views.hr_search_supervisor_assignments, name='hr_search_supervisor_assignments'),

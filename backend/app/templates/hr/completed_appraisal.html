@@ -12,23 +12,11 @@
     <h2>Completed Appraisal</h2>
     <p class="text-muted">This appraisal is completed and locked for HR.</p>
     {% include 'appraisal/_employee_details.html' %}
-    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
-
-    <div class="card mb-4">
-        <div class="card-header bg-dark text-white">Appraisal Details</div>
-        <div class="card-body">
-            <p><strong>Employee:</strong> {{ appraisal.employee.user.username }} — {{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</p>
-            <p><strong>Department:</strong> {{ appraisal.employee.department.name|default:"Not assigned" }}</p>
-            <p><strong>Cycle:</strong> {{ appraisal.cycle.year }}</p>
-            <p><strong>Supervisor:</strong> {{ appraisal.supervisor.user.username|default:"Not assigned" }}</p>
-            <p><strong>HOD:</strong> {{ appraisal.hod.user.username|default:"Not assigned" }}</p>
-            <p><strong>Overall percentage:</strong> {{ appraisal.overall_percentage|default:"Not calculated" }}</p>
-            <p><strong>Final rating:</strong> {{ appraisal.final_rating|default:"Not determined" }}</p>
-        </div>
-    </div>
-
     {% include 'appraisal/_training.html' %}
+    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
+    {% include 'appraisal/_guidance_notes.html' %}
     {% include 'appraisal/_targets_readonly.html' %}
+    {% include 'appraisal/_midyear_endyear_readonly.html' %}
     {% include 'appraisal/_competencies_readonly.html' %}
     {% include 'appraisal/_annual_appraisal_results.html' %}
     {% include 'appraisal/_appraisal_comment_sections.html' %}

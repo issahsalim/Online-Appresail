@@ -12,6 +12,7 @@ from .models import (
     Competency,
     Department,
     EmployeeProfile,
+    SupervisorReporting,
     AppraisalCycle
 )
 
@@ -240,41 +241,98 @@ AppraisalTrainingFormSet = forms.inlineformset_factory(
 
 class HRSupervisorAssignmentForm(forms.Form):
     department = forms.ModelChoiceField(queryset=Department.objects.order_by('name'))
-    employee = forms.ModelChoiceField(
-        queryset=EmployeeProfile.objects.none(),
-        error_messages={'invalid_choice': "Choose an employee from the selected department."},
-    )
     supervisor = forms.ModelChoiceField(
         queryset=EmployeeProfile.objects.none(),
-        error_messages={'invalid_choice': "Choose a supervisor from the selected department."},
+        error_messages={'invalid_choice': "Choose a department reviewer from the selected department."},
+        label='Department reviewer for everyone in this department',
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         department_id = self.data.get('department') or self.initial.get('department')
         if department_id:
-            self.fields['employee'].queryset = EmployeeProfile.objects.filter(
-                role__in=['Employee', 'Supervisor'],
-                department_id=department_id,
-            ).select_related('user').order_by('user__username')
             self.fields['supervisor'].queryset = EmployeeProfile.objects.filter(
-                role='Supervisor',
                 department_id=department_id,
-            ).select_related('user').order_by('user__username')
+            ).exclude(role='HR').select_related('user').order_by('user__username')
+        self.fields['department'].widget.attrs['class'] = 'form-select'
+        self.fields['supervisor'].widget.attrs['class'] = 'form-select'
 
     def clean(self):
         cleaned_data = super().clean()
         department = cleaned_data.get('department')
-        employee = cleaned_data.get('employee')
         supervisor = cleaned_data.get('supervisor')
 
-        if department and employee and employee.department_id != department.id:
-            self.add_error('employee', "Choose an employee from the selected department.")
         if department and supervisor and supervisor.department_id != department.id:
-            self.add_error('supervisor', "Choose a supervisor from the selected department.")
-        if employee and supervisor and employee == supervisor:
-            self.add_error('supervisor', "A supervisor cannot be assigned to themselves.")
+            self.add_error('supervisor', "Choose a reviewer from the selected department.")
+        if supervisor and supervisor.role == 'HR':
+            self.add_error('supervisor', "HR users cannot be department reviewers.")
 
+        return cleaned_data
+
+
+class HRDepartmentHodAssignmentForm(forms.Form):
+    department = forms.ModelChoiceField(
+        queryset=Department.objects.order_by('name'),
+        label='Department',
+    )
+    hod = forms.ModelChoiceField(
+        queryset=EmployeeProfile.objects.filter(role='HOD').select_related(
+            'user',
+        ).order_by('department__name', 'user__username'),
+        label='Head of Department',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-select'
+
+
+class SupervisorReportingForm(forms.Form):
+    supervisor = forms.ModelChoiceField(
+        queryset=EmployeeProfile.objects.filter(role='Supervisor').select_related('user').order_by(
+            'department__name', 'user__username',
+        ),
+        label='Supervisor who needs an HOD',
+    )
+    manager = forms.ModelChoiceField(
+        queryset=EmployeeProfile.objects.filter(role='HOD').select_related('user').order_by(
+            'department__name', 'user__username',
+        ),
+        label='Their Head of Department',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-select'
+
+    def clean(self):
+        cleaned_data = super().clean()
+        supervisor = cleaned_data.get('supervisor')
+        manager = cleaned_data.get('manager')
+        if supervisor and manager:
+            existing_line = SupervisorReporting.objects.filter(
+                supervisor=supervisor,
+            ).first()
+            line = existing_line or SupervisorReporting(
+                supervisor=supervisor,
+                manager=manager,
+            )
+            line.manager = manager
+            if supervisor.pk == manager.pk:
+                self.add_error('manager', 'A supervisor cannot report to themselves.')
+            else:
+                try:
+                    line.clean()
+                except ValidationError as error:
+                    field_errors = (
+                        error.error_dict.get('manager', [])
+                        if hasattr(error, 'error_dict')
+                        else error.error_list
+                    )
+                    for field_error in field_errors:
+                        self.add_error('manager', field_error.message)
         return cleaned_data
 
 
@@ -333,10 +391,7 @@ class EmployeeCompetencySelectionForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        competencies = Competency.objects.order_by(
-            'competency_type',
-            'name',
-        )
+        competencies = Competency.objects.all()
         self.fields['competencies'].queryset = competencies
         self.competency_groups = [
             {
@@ -365,7 +420,20 @@ class SupervisorTargetForm(forms.ModelForm):
     class Meta:
         model = AppraisalTarget
         # Supervisor can ONLY touch the mid-year and end-year fields
-        fields = ['mid_year_progress', 'mid_year_remark', 'end_year_assessment', 'end_year_weight', 'end_year_score', 'end_year_comment']
+        fields = ['mid_year_progress', 'mid_year_remark', 'end_year_assessment', 'end_year_score', 'end_year_comment']
+        widgets = {
+            'end_year_score': forms.NumberInput(attrs={'min': 1, 'max': 5}),
+        }
+
+
+class HODAppraisalTargetScoringForm(forms.ModelForm):
+    class Meta:
+        model = AppraisalTarget
+        fields = [
+            'end_year_assessment',
+            'end_year_score',
+            'end_year_comment',
+        ]
         widgets = {
             'end_year_score': forms.NumberInput(attrs={'min': 1, 'max': 5}),
         }
@@ -409,11 +477,10 @@ class SupervisorCompetencyStatementForm(forms.ModelForm):
         model = AppraisalCompetencyStatementScore
         fields = ['end_year_score']
         widgets = {
-            'end_year_score': forms.RadioSelect(choices=[(i, str(i)) for i in range(1, 6)]),
-        }
-        widgets = {
-            # Render end_year_score as radio buttons (1 to 5) instead of a dropdown
-            'end_year_score': forms.RadioSelect(choices=[(i, str(i)) for i in range(1, 6)]),
+            'end_year_score': forms.RadioSelect(
+                choices=[(i, str(i)) for i in range(1, 6)],
+                attrs={'class': 'score-radio-options'},
+            ),
         }
 
 
@@ -459,6 +526,14 @@ SupervisorTargetFormSet = forms.inlineformset_factory(
     form=SupervisorTargetForm, 
     extra=0, # 0 means don't show empty rows; only show the targets the employee created
     can_delete=False
+)
+
+HODAppraisalTargetScoringFormSet = forms.inlineformset_factory(
+    Appraisal,
+    AppraisalTarget,
+    form=HODAppraisalTargetScoringForm,
+    extra=0,
+    can_delete=False,
 )
 
 SupervisorCompetencyFormSet = forms.inlineformset_factory(

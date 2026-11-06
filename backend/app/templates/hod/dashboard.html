@@ -68,15 +68,21 @@
     </style>
 
     <aside class="role-dashboard-sidebar" aria-label="HOD dashboard navigation">
+        <button class="role-sidebar-toggle" type="button" aria-controls="hod-dashboard-navigation" aria-expanded="false" aria-label="Open menu">
+            <span aria-hidden="true">☰</span>
+        </button>
         <div class="role-sidebar-brand">
             <span class="role-sidebar-mark" aria-hidden="true">✚</span>
             <span>Staff Appraisal<br><small class="fw-normal opacity-75">HOD WORKSPACE</small></span>
-            <button class="role-sidebar-toggle" type="button" aria-controls="hod-dashboard-navigation" aria-expanded="false">
-                <span aria-hidden="true">☰</span> Menu
-            </button>
         </div>
         <div class="role-sidebar-label">Workspace</div>
+        <button class="role-sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
         <nav class="role-sidebar-nav" id="hod-dashboard-navigation">
+            <div class="role-sidebar-drawer-brand">
+                <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+                <span class="role-sidebar-drawer-copy">Mathias Catholic Hospital<small>HOD WORKSPACE</small></span>
+                <button class="role-sidebar-close" type="button" aria-label="Close menu" data-sidebar-close>×</button>
+            </div>
             <button class="role-sidebar-link active" type="button" data-role-section-target="pending">
                 <span class="role-sidebar-icon" aria-hidden="true">◷</span>
                 <span class="role-sidebar-link-copy">
@@ -165,7 +171,11 @@
                                     <td><span class="hod-status">{{ appraisal.get_status_display }}</span></td>
                                     <td>
                                         <div class="d-flex flex-wrap gap-2">
-                                            <a href="{% url 'hod_review' appraisal.id %}" class="hod-action">Review</a>
+                                            {% if appraisal.status == 'pending_manager' or appraisal.status == 'returned_supervisor' %}
+                                                <a href="{% url 'supervisor_review' appraisal.id %}" class="hod-action">Score appraisal</a>
+                                            {% else %}
+                                                <a href="{% url 'hod_review' appraisal.id %}" class="hod-action">Review</a>
+                                            {% endif %}
                                             <a href="{% url 'hod_view_appraisal' appraisal.id %}" class="hod-action hod-action-secondary">View</a>
                                         </div>
                                     </td>
@@ -225,25 +235,31 @@
 
     <section class="hod-workspace role-dashboard-section" data-role-section="own" aria-label="My own appraisal" hidden>
             <div class="p-3 p-lg-4">
-                <section class="hod-own-card">
-                    <h2>My own appraisal</h2>
-                    {% if my_appraisal %}
-                        <p>Cycle {{ my_appraisal.cycle.year }} · <span class="hod-status">{{ my_appraisal.get_status_display }}</span></p>
+                <div class="hod-section-heading">
+                    <h2>My own appraisals</h2>
+                    <p>Access your appraisal for each cycle. Draft and returned forms can be edited.</p>
+                </div>
+                {% for appraisal in my_appraisals %}
+                    <section class="hod-own-card mb-3">
+                        <h2>Cycle {{ appraisal.cycle.year }}{% if appraisal.cycle.is_active %} · Active{% endif %}</h2>
+                        <p><span class="hod-status">{{ appraisal.get_status_display }}</span></p>
                         <div class="hod-own-actions">
-                            <a href="{% url 'fill_targets' %}" class="hod-action hod-action-secondary">
-                                {% if my_appraisal.status == 'draft' or my_appraisal.status == 'returned_employee' %}Edit my goals{% else %}View my appraisal{% endif %}
-                            </a>
-                            {% if my_appraisal.status == 'draft' %}
-                                <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
+                            {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %}
+                                <a href="{% url 'fill_targets_year' appraisal.cycle.year %}" class="hod-action hod-action-secondary">
+                                    {% if appraisal.status == 'returned_employee' %}Review and resubmit{% else %}Edit my goals{% endif %}
+                                </a>
+                                <form method="post" action="{% url 'submit_to_supervisor' appraisal.id %}">
                                     {% csrf_token %}
-                                    <button type="submit" class="hod-action">Submit to my supervisor</button>
+                                    <button type="submit" class="hod-action">Submit directly to HR</button>
                                 </form>
+                            {% else %}
+                                <a href="{% url 'employee_appraisal_detail' appraisal.id %}" class="hod-action hod-action-secondary">View appraisal</a>
                             {% endif %}
                         </div>
-                    {% else %}
-                        <p>There is no active appraisal cycle. Contact HR for information about the next cycle.</p>
-                    {% endif %}
-                </section>
+                    </section>
+                {% empty %}
+                    <p class="text-muted">There are no appraisal cycles available.</p>
+                {% endfor %}
             </div>
     </section>
     </main>

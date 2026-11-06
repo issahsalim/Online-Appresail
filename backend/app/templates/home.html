@@ -17,7 +17,7 @@
             --muted: #647784;
         }
 
-        html { scroll-behavior: smooth; }
+        html { overflow-x: clip; scroll-behavior: smooth; }
         body {
             color: var(--ink);
             font-family: Inter, "Segoe UI", Arial, sans-serif;
@@ -264,6 +264,7 @@
         footer {
             background: #061e32;
             color: rgba(255,255,255,.68);
+            overflow-x: clip;
             padding: 72px 0 28px;
             position: relative;
         }
@@ -287,6 +288,7 @@
             .hero { min-height: 650px; padding-top: 130px; }
             .hero h1 { max-width: 560px; }
             .section-pad { padding: 72px 0; }
+            .section-pad .row.g-5 { --bs-gutter-x: 1.5rem; }
             .photo-frame img { height: 330px; }
             .nav-link-custom { margin: .45rem 0; }
             .appraisal-timeline { height: auto; margin: 2rem 0 0; }

@@ -1,0 +1,94 @@
+<section class="appraisal-paper appraisal-midyear-paper" aria-labelledby="mid-year-review-readonly-heading">
+    <h2 class="appraisal-section-title" id="mid-year-review-readonly-heading">SECTION 3: Mid-Year Review Form</h2>
+    <div class="appraisal-section-body">
+        <p class="appraisal-help">Progress discussed and agreements reached at the mid-year review.</p>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr><th>No.</th><th>Target</th><th>Progress review</th><th>Remarks</th></tr>
+                </thead>
+                <tbody>
+                    {% for target in targets %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>{{ target.target_description|default:"—" }}</td>
+                            <td>{{ target.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
+                            <td>{{ target.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <h3 class="appraisal-subsection-title mt-4">Competency progress review</h3>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr><th>Competency statement</th><th>Progress review</th><th>Remarks</th></tr>
+                </thead>
+                <tbody>
+                    {% for group in score_breakdown.groups %}
+                        {% with score=group.score %}
+                            {% for statement in group.statements %}
+                                <tr>
+                                    <td>{{ statement.statement }}</td>
+                                    <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
+                                    <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td>{{ group.name }}</td>
+                                    <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
+                                    <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endwith %}
+                    {% empty %}
+                        <tr><td colspan="3" class="text-center">No competency reviews have been added to this appraisal.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="appraisal-paper appraisal-endyear-paper" aria-labelledby="end-year-review-readonly-heading">
+    <h2 class="appraisal-section-title" id="end-year-review-readonly-heading">SECTION 4: End-of-Year Review Form</h2>
+    <div class="appraisal-section-body">
+        <p class="appraisal-help">End-of-year assessment and scoring completed by the appraiser.</p>
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle appraisal-target-review-table">
+                <thead>
+                    <tr>
+                        <th>No.</th>
+                        <th>Target</th>
+                        <th>Performance assessment</th>
+                        <th>Weight of target</th>
+                        <th>Score / rating</th>
+                        <th>Comments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for target in targets %}
+                        <tr>
+                            <td class="text-center">{{ forloop.counter }}</td>
+                            <td>{{ target.target_description|default:"—" }}</td>
+                            <td>{{ target.get_end_year_assessment_display|default:"Not reviewed yet" }}</td>
+                            <td>{{ target.end_year_weight|default:"—" }}</td>
+                            <td>{% if target.end_year_score != None %}{{ target.end_year_score }}{% else %}Not scored yet{% endif %}</td>
+                            <td>{{ target.get_end_year_comment_display|default:"Not reviewed yet" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="appraisal-results-lines">
+            <p><strong>Q — Sum of end-year target scores:</strong><span>=</span><span>{{ score_breakdown.target_total|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>A — Average of end-year target scores:</strong><span>=</span><span>{{ score_breakdown.target_average|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>M — A × 0.6:</strong><span>=</span><span>{{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+        </div>
+    </div>
+</section>

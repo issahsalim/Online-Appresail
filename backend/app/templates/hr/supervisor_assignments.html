@@ -2,28 +2,27 @@
 
 {% block content %}
 <div class="container mt-5 mb-5">
-    <h2>Assign Supervisors to Employees</h2>
-    <p class="text-muted">Choose a department first. Employee and supervisor lists are limited to that department.</p>
+    <h2>Department Reviewer Assignments</h2>
+    <p class="text-muted">Each department has one reviewer. Employees in the department submit their appraisals to this person.</p>
 
     <div class="card mb-4">
-        <div class="card-header">Assign or Change Supervisor</div>
+        <div class="card-header">Assign or Change Department Reviewer</div>
         <div class="card-body">
-            {% if transfer_confirmation %}
+            {% if transfer_confirmation and not transfer_confirmation.reporting %}
                 <div class="alert alert-warning" role="alert">
                     <strong>Confirm appraisal transfer</strong>
                     <p class="mb-2">
                         This will transfer {{ transfer_confirmation.appraisal_count }} in-progress
-                        appraisal(s) for {{ transfer_confirmation.employee_name }} to
+                        appraisal(s) for the {{ transfer_confirmation.department_name }} department to
                         {{ transfer_confirmation.supervisor_name }}. Existing scores, comments,
                         and return history will be preserved.
                     </p>
                     <form method="post">
                         {% csrf_token %}
                         <input type="hidden" name="department" value="{{ transfer_confirmation.department_id }}">
-                        <input type="hidden" name="employee" value="{{ transfer_confirmation.employee_id }}">
                         <input type="hidden" name="supervisor" value="{{ transfer_confirmation.supervisor_id }}">
                         <input type="hidden" name="confirm_transfer" value="1">
-                        <button type="submit" class="btn btn-warning">Confirm supervisor transfer</button>
+                        <button type="submit" class="btn btn-warning">Confirm reviewer transfer</button>
                         <a href="{% url 'hr_supervisor_assignments' %}" class="btn btn-secondary">Cancel</a>
                     </form>
                 </div>
@@ -42,9 +41,7 @@
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
-                <button type="submit" class="btn btn-primary">
-                    {% if transfer_confirmation %}Edit assignment{% else %}Save Supervisor Assignment{% endif %}
-                </button>
+                <button type="submit" class="btn btn-primary">Save Department Reviewer</button>
                 <a href="{% url 'hr_dashboard' %}" class="btn btn-secondary">Back to HR Dashboard</a>
             </form>
         </div>
@@ -58,7 +55,7 @@
                 id="assignment-search"
                 type="search"
                 class="form-control"
-                placeholder="Staff ID, employee, supervisor, or department"
+                placeholder="Department reviewer or department"
                 autocomplete="off"
             >
         </div>
@@ -78,8 +75,7 @@
             <thead class="table-dark">
                 <tr>
                     <th>Department</th>
-                    <th>Employee</th>
-                    <th>Supervisor</th>
+                    <th>Department reviewer</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -91,13 +87,70 @@
     </nav>
 </div>
 
+<div class="container mb-5">
+    <div class="card mb-4">
+        <div class="card-header">Assign a Supervisor's Manager</div>
+        <div class="card-body">
+            <p class="text-muted">Assign the HOD who reviews each supervisor's own appraisal.</p>
+            {% if transfer_confirmation.reporting %}
+                <div class="alert alert-warning" role="alert">
+                    This will transfer {{ transfer_confirmation.appraisal_count }} in-progress appraisal(s)
+                    for {{ transfer_confirmation.supervisor_name }} to {{ transfer_confirmation.manager_name }}.
+                    Existing scores, comments, and return history will be preserved.
+                    <form method="post" class="mt-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="reporting_action" value="save">
+                        <input type="hidden" name="reporting-supervisor" value="{{ transfer_confirmation.supervisor_id }}">
+                        <input type="hidden" name="reporting-manager" value="{{ transfer_confirmation.manager_id }}">
+                        <input type="hidden" name="confirm_transfer" value="1">
+                        <button type="submit" class="btn btn-warning">Confirm supervisor transfer</button>
+                    </form>
+                </div>
+            {% endif %}
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="reporting_action" value="save">
+                {% for field in reporting_form %}
+                    <div class="mb-3">
+                        {{ field.label_tag }}
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                {% if reporting_form.non_field_errors %}
+                    <div class="alert alert-danger">{{ reporting_form.non_field_errors }}</div>
+                {% endif %}
+                <button type="submit" class="btn btn-primary">Save Supervisor Reporting Line</button>
+            </form>
+        </div>
+    </div>
+    <h3>Supervisor Reporting Lines</h3>
+    <div class="table-responsive">
+        <table class="table table-hover bg-white">
+            <thead class="table-dark">
+                <tr><th>Supervisor</th><th>Reports to</th></tr>
+            </thead>
+            <tbody>
+                {% for assignment in reporting_assignments %}
+                    <tr>
+                        <td>{{ assignment.supervisor.user.username }} - {{ assignment.supervisor.user.get_full_name|default:assignment.supervisor.user.username }}</td>
+                        <td>{{ assignment.manager.user.username }} - {{ assignment.manager.user.get_full_name|default:assignment.manager.user.username }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2" class="text-center">No supervisor reporting lines assigned.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <script>
     (function () {
         const departmentSelect = document.getElementById('id_department');
-        const employeeSelect = document.getElementById('id_employee');
         const supervisorSelect = document.getElementById('id_supervisor');
         const optionsUrl = "{% url 'hr_assignment_options' %}";
-        const initialEmployee = employeeSelect.value;
         const initialSupervisor = supervisorSelect.value;
         const searchInput = document.getElementById('assignment-search');
         const departmentFilter = document.getElementById('assignment-department-filter');
@@ -112,11 +165,9 @@
             select.replaceChildren(new Option(placeholder, ''));
         }
 
-        async function loadOptions(preserveEmployee, preserveSupervisor) {
+        async function loadOptions(preserveSupervisor) {
             const departmentId = departmentSelect.value;
-            resetSelect(employeeSelect, 'Select an employee');
-            resetSelect(supervisorSelect, 'Select a supervisor');
-            employeeSelect.disabled = true;
+            resetSelect(supervisorSelect, 'Select a department reviewer');
             supervisorSelect.disabled = true;
 
             if (!departmentId) {
@@ -124,27 +175,18 @@
             }
 
             const params = new URLSearchParams({ department_id: departmentId });
-            if (preserveEmployee) {
-                params.set('employee_id', preserveEmployee);
-            }
 
             try {
                 const response = await fetch(`${optionsUrl}?${params.toString()}`);
                 const data = await response.json();
                 if (!response.ok) {
-                    throw new Error(data.error || 'Could not load department employees and supervisors.');
+                    throw new Error(data.error || 'Could not load department reviewers.');
                 }
 
-                data.employees.forEach((employee) => {
-                    employeeSelect.add(new Option(employee.label, employee.id));
-                });
                 data.supervisors.forEach((supervisor) => {
                     supervisorSelect.add(new Option(supervisor.label, supervisor.id));
                 });
 
-                if (preserveEmployee) {
-                    employeeSelect.value = preserveEmployee;
-                }
                 if (preserveSupervisor) {
                     supervisorSelect.value = preserveSupervisor;
                 } else if (data.current_supervisor_id) {
@@ -153,16 +195,12 @@
             } catch (error) {
                 window.showAppModal(error.message, 'Could not load assignments');
             } finally {
-                employeeSelect.disabled = false;
                 supervisorSelect.disabled = false;
             }
         }
 
         departmentSelect.addEventListener('change', function () {
-            loadOptions('', '');
-        });
-        employeeSelect.addEventListener('change', function () {
-            loadOptions(employeeSelect.value, '');
+            loadOptions('');
         });
 
         function renderPagination(data) {
@@ -198,9 +236,9 @@
             if (!data.results.length) {
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 4;
+                cell.colSpan = 3;
                 cell.className = 'text-center';
-                cell.textContent = 'No matching supervisor assignments found.';
+                cell.textContent = 'No matching department reviewer assignments found.';
                 row.append(cell);
                 resultsBody.append(row);
                 return;
@@ -210,7 +248,6 @@
                 const row = document.createElement('tr');
                 [
                     assignment.department,
-                    `${assignment.employee_staff_id} - ${assignment.employee_name}`,
                     `${assignment.supervisor_staff_id} - ${assignment.supervisor_name}`,
                 ].forEach((value) => {
                     const cell = document.createElement('td');
@@ -271,11 +308,9 @@
         searchAssignments(1);
 
         if (departmentSelect.value) {
-            loadOptions(initialEmployee, initialSupervisor);
+            loadOptions(initialSupervisor);
         } else {
-            resetSelect(employeeSelect, 'Select a department first');
             resetSelect(supervisorSelect, 'Select a department first');
-            employeeSelect.disabled = true;
             supervisorSelect.disabled = true;
         }
     })();

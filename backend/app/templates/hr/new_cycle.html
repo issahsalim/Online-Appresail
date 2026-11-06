@@ -225,7 +225,7 @@
                                                 method="post"
                                                 action="{% url 'set_appraisal_cycle_status' cycle.id %}"
                                                 class="hr-cycle-action-form"
-                                                data-confirm="{% if cycle.is_active %}Deactivate appraisal cycle {{ cycle.year }}? Employees and reviewers will no longer be able to work on this cycle.{% else %}Activate appraisal cycle {{ cycle.year }}? Any other active cycle will be deactivated.{% endif %}"
+                                                data-confirm="{% if cycle.is_active %}Deactivate appraisal cycle {{ cycle.year }}? Staff can still finish existing drafts or returned appraisals, but no new appraisal will be started for this cycle.{% else %}Activate appraisal cycle {{ cycle.year }}? Any other active cycle will be deactivated.{% endif %}"
                                                 data-confirm-title="Change cycle status?"
                                                 data-confirm-label="{% if cycle.is_active %}Deactivate cycle{% else %}Activate cycle{% endif %}"
                                             >

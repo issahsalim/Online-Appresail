@@ -8,21 +8,25 @@ from django.test.client import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 from django.conf import settings
+from .audit import reset_audit_request_context, set_audit_request_context
 
+from .forms import EmployeeCompetencySelectionForm
 from .models import (
     Appraisal,
     AppraisalCycle,
     AppraisalCompetencyScore,
     AppraisalCompetencyStatementScore,
     AppNotification,
+    AuditLog,
     AppraisalReturn,
     AppraisalTarget,
     AppraisalTraining,
     AssignDepartmentHod,
+    DepartmentSupervisor,
     Competency,
     Department,
     EmployeeProfile,
-    AssignSupervisor,
+    SupervisorReporting,
 )
 
 
@@ -64,7 +68,7 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         )
         self.appraisal.competency_scores.create(
             competency=competency,
-            mid_year_progress='demonstrated',
+            mid_year_progress='well_exhibited',
             end_year_score=5,
         )
         self.client.force_login(self.user)
@@ -73,18 +77,22 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         response = self.client.get(reverse('fill_targets'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Supervisor Review')
+        self.assertNotContains(response, 'pending_manager')
         self.assertContains(response, 'Improve service')
         self.assertContains(response, 'Target achieved')
         self.assertContains(response, 'Good progress.')
-        self.assertContains(response, 'Supervisor details')
+        self.assertContains(response, 'SECTION 1 - B: Appraiser’s Information')
         self.assertContains(response, 'Morgan Supervisor')
-        self.assertContains(response, 'supervisor-001')
+        self.assertNotContains(response, 'supervisor-001')
+        self.assertContains(response, 'Position:')
         self.assertContains(response, 'Team Lead')
         self.assertContains(response, 'morgan@example.com')
         self.assertContains(response, 'Work effectively with colleagues toward shared goals.')
-        self.assertContains(response, 'End-year score:</strong> 4')
-        self.assertContains(response, 'End-year score:</strong> 5')
-        self.assertContains(response, 'Overall Score Calculation')
+        self.assertContains(response, '>4</td>')
+        self.assertContains(response, '>5</td>')
+        self.assertNotContains(response, 'End-year score:</strong>')
+        self.assertContains(response, 'SECTION 5: Annual Appraisal')
 
         self.assertContains(response, 'M — A × 0.6:')
         self.assertContains(response, 'N — Average of core competency group averages:')
@@ -107,6 +115,78 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         )
         self.appraisal.refresh_from_db()
         self.assertEqual(self.appraisal.targets.get().end_year_score, 4)
+
+    def test_completed_appraisal_print_view_shows_save_as_pdf_and_all_score_sections(self):
+        self.appraisal.status = 'completed'
+        self.appraisal.save(update_fields=['status'])
+        AppraisalTraining.objects.create(
+            appraisal=self.appraisal,
+            institution='Yeji Training Centre',
+            date=datetime(2026, 6, 15),
+            programme='Patient care workshop',
+        )
+        AppraisalReturn.objects.create(
+            appraisal=self.appraisal,
+            reviewer_name='Morgan Supervisor',
+            stage='supervisor',
+            from_status='pending_manager',
+            to_status='returned_employee',
+            comment='Please revise the returned section.',
+        )
+
+        response = self.client.get(
+            reverse('employee_appraisal_pdf', args=[self.appraisal.id]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Please revise the returned section.')
+        self.assertContains(response, 'Download / Save as PDF')
+        self.assertContains(response, 'SECTION 1 - A: Appraisee’s Personal Information')
+        self.assertContains(response, 'TRAINING RECEIVED DURING THE YEAR UNDER REVIEW')
+        self.assertContains(response, 'Patient care workshop')
+        self.assertContains(response, 'Morgan Supervisor')
+        self.assertNotContains(response, 'supervisor-001')
+        self.assertContains(response, 'Position:')
+        self.assertContains(response, 'SECTION 2: Performance Planning Form')
+        self.assertContains(response, 'appraisal-planning-paper')
+        self.assertContains(response, '@page appraisal-planning-landscape')
+        self.assertContains(response, '@page appraisal-review-landscape')
+        self.assertContains(response, 'size: A4 landscape')
+        self.assertContains(response, 'table-layout: fixed !important')
+        self.assertContains(response, 'appraisal-midyear-paper')
+        self.assertContains(response, 'appraisal-endyear-paper')
+        endyear_start = response.content.decode().index('SECTION 4: End-of-Year Review Form')
+        calculation_start = response.content.decode().index('Q — Sum of end-year target scores:', endyear_start)
+        next_section_start = response.content.decode().index(
+            'SECTION 5: Annual Appraisal — Core Competencies',
+            calculation_start,
+        )
+        self.assertLess(endyear_start, calculation_start)
+        self.assertLess(calculation_start, next_section_start)
+        self.assertContains(response, 'SECTION 3: Mid-Year Review Form')
+        self.assertContains(response, 'SECTION 4: End-of-Year Review Form')
+        self.assertContains(response, 'SECTION 5: Annual Appraisal — Core Competencies')
+        self.assertContains(response, 'SECTION 5: Annual Appraisal (Continuation) — Non-Core Competencies')
+        self.assertNotContains(response, 'Sections 6–10: Comments and assessment')
+        self.assertContains(response, 'SECTION 6: Annual Appraisal')
+        self.assertContains(response, 'SECTION 7: Career Development')
+        self.assertContains(response, 'SECTION 8: Assessment Decision')
+        self.assertContains(response, 'SECTION 9: Appraisee’s Comments on Overall Assessment')
+        self.assertContains(response, 'SECTION 10: Head of Department’s / Unit’s Comments on Overall Assessment')
+        self.assertContains(response, 'Final HR Approval')
+        self.assertContains(response, 'Overall Performance Rating')
+        self.assertContains(response, '@page { size: A4 portrait;')
+        self.assertContains(response, 'overflow: visible !important')
+        self.assertContains(response, 'break-inside: avoid !important')
+        self.assertContains(response, 'page-break-inside: avoid !important')
+        self.assertContains(response, 'min-width: 0 !important')
+        self.assertContains(response, 'background-color: #a43a10 !important')
+        self.assertContains(response, 'print-color-adjust: exact !important')
+
+        detail_response = self.client.get(
+            reverse('employee_appraisal_detail', args=[self.appraisal.id]),
+        )
+        self.assertContains(detail_response, 'Please revise the returned section.')
 
     def test_dashboard_progress_reflects_each_appraisal_stage(self):
         expected_progress = {
@@ -151,6 +231,31 @@ class EmployeeAppraisalVisibilityTests(TestCase):
             'body:has(.role-dashboard-shell, .hr-dashboard-shell) > .navbar-appraisal',
         )
 
+    def test_mobile_dashboard_navigation_has_vertical_animated_toggle(self):
+        response = self.client.get(reverse('employee_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'aria-controls="employee-dashboard-navigation"',
+        )
+        self.assertContains(
+            response,
+            '.role-sidebar-nav { display: grid; gap: .55rem; grid-template-columns: minmax(0, 1fr); }',
+        )
+        self.assertContains(response, '.role-dashboard-sidebar.is-expanded .role-sidebar-nav')
+        self.assertContains(response, 'grid-template-columns: minmax(0, 1fr)')
+        self.assertContains(response, 'transform: translateX(-105%)')
+        self.assertContains(response, 'role-sidebar-backdrop')
+        self.assertContains(response, '.role-sidebar-brand { display: none; }')
+        self.assertContains(response, 'role-sidebar-drawer-brand')
+        self.assertContains(response, 'Mathias Catholic Hospital<small>EMPLOYEE WORKSPACE</small>')
+        self.assertContains(response, 'data-sidebar-close')
+        self.assertContains(response, '.role-dashboard-content { padding: 4.75rem 1.1rem 1.1rem; }')
+        self.assertContains(response, 'top: 4.5rem;')
+        self.assertContains(response, "event.key === 'Escape'")
+        self.assertContains(response, 'navigation.inert = mobile && !expanded')
+
     def test_active_dashboard_shows_only_the_newest_active_cycle(self):
         newer_cycle = AppraisalCycle.objects.create(year=2027, is_active=True)
         older_cycle = self.appraisal.cycle
@@ -163,11 +268,94 @@ class EmployeeAppraisalVisibilityTests(TestCase):
             response.context['active_appraisal_cards'][0]['cycle'],
             newer_cycle,
         )
-        self.assertContains(response, 'Cycle 2027 Appraisal')
-        self.assertNotContains(response, 'Cycle 2026 Appraisal')
+        self.assertContains(response, '2027 Appraisal')
+        self.assertNotContains(response, '2026 Appraisal')
+        self.assertContains(response, 'Cycle 2026')
         self.assertTrue(
             Appraisal.objects.filter(employee=self.profile, cycle=older_cycle).exists()
         )
+
+    def test_dashboard_history_includes_cycles_without_an_existing_appraisal(self):
+        older_cycle = self.appraisal.cycle
+        self.appraisal.delete()
+        newer_cycle = AppraisalCycle.objects.create(year=2027, is_active=True)
+
+        response = self.client.get(reverse('employee_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        history_cycles = {
+            appraisal.cycle_id
+            for appraisal in response.context['all_appraisals']
+        }
+        self.assertEqual(
+            history_cycles,
+            {older_cycle.id, newer_cycle.id},
+        )
+        self.assertContains(response, 'Cycle 2026')
+        self.assertContains(response, 'Cycle 2027')
+        self.assertContains(
+            response,
+            reverse('fill_targets_year', args=[older_cycle.year]),
+        )
+        self.assertContains(
+            response,
+            reverse('fill_targets_year', args=[newer_cycle.year]),
+        )
+
+    def test_returned_appraisal_from_inactive_cycle_can_be_edited_and_saved(self):
+        self.appraisal.status = 'returned_employee'
+        self.appraisal.cycle.is_active = False
+        self.appraisal.cycle.save(update_fields=['is_active'])
+        self.appraisal.save(update_fields=['status'])
+
+        response = self.client.get(
+            reverse('fill_targets_year', args=[self.appraisal.cycle.year]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['read_only'])
+        self.assertContains(response, 'Review and resubmit')
+
+        response = self.client.post(
+            reverse('fill_targets_year', args=[self.appraisal.cycle.year]),
+            {
+                'action': 'save_personal',
+                'employee_info-employee_comments': 'I updated my returned appraisal.',
+                'trainings-TOTAL_FORMS': '4',
+                'trainings-INITIAL_FORMS': '0',
+                'trainings-MIN_NUM_FORMS': '0',
+                'trainings-MAX_NUM_FORMS': '4',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('fill_targets_year', args=[self.appraisal.cycle.year])}?step=1",
+        )
+        self.appraisal.refresh_from_db()
+        self.assertEqual(
+            self.appraisal.employee_comments,
+            'I updated my returned appraisal.',
+        )
+        self.assertEqual(self.appraisal.status, 'returned_employee')
+
+    def test_history_keeps_editable_appraisals_available_from_every_cycle(self):
+        older_cycle = AppraisalCycle.objects.create(year=2025, is_active=False)
+        older_appraisal = Appraisal.objects.create(
+            employee=self.profile,
+            cycle=older_cycle,
+            status='returned_employee',
+        )
+
+        response = self.client.get(reverse('employee_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Cycle 2025')
+        self.assertContains(
+            response,
+            reverse('fill_targets_year', args=[older_appraisal.cycle.year]),
+        )
+        self.assertContains(response, 'Review and resubmit')
 
     def test_employee_sees_message_when_supervisor_is_not_assigned(self):
         self.appraisal.supervisor = None
@@ -187,9 +375,8 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         self.appraisal.supervisor = None
         self.appraisal.status = 'draft'
         self.appraisal.save(update_fields=['supervisor', 'status'])
-        AssignSupervisor.objects.create(
+        DepartmentSupervisor.objects.create(
             department=department,
-            employee=self.profile,
             supervisor=self.supervisor,
         )
 
@@ -197,9 +384,10 @@ class EmployeeAppraisalVisibilityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context['read_only'])
-        self.assertContains(response, 'Supervisor details')
+        self.assertContains(response, 'SECTION 1 - B: Appraiser’s Information')
         self.assertContains(response, 'Morgan Supervisor')
-        self.assertContains(response, 'supervisor-001')
+        self.assertNotContains(response, 'supervisor-001')
+        self.assertContains(response, 'Position:')
         self.assertContains(response, 'Team Lead')
         self.assertContains(response, 'morgan@example.com')
 
@@ -219,7 +407,11 @@ class EmployeeAppraisalVisibilityTests(TestCase):
         self.assertContains(response, 'data-step-nav="2"')
         self.assertContains(response, 'data-step-nav="3"')
         self.assertContains(response, 'data-step-nav="4"')
-        self.assertContains(response, '/ 5 steps')
+        self.assertContains(response, '/ 5 pages')
+        self.assertContains(response, 'appraisal-target-entry-table')
+        self.assertContains(response, 'appraisal-mobile-field-label')
+        self.assertContains(response, 'flex-wrap: nowrap')
+        self.assertContains(response, 'Save and continue')
 
     def test_preview_is_a_separate_live_read_only_final_step(self):
         self.appraisal.status = 'draft'
@@ -339,6 +531,8 @@ class PublicHomePageTests(TestCase):
         self.assertContains(response, 'images/heroImage1.webp')
         self.assertContains(response, 'images/staff-colla1.webp')
         self.assertContains(response, reverse('login'))
+        self.assertContains(response, 'html { overflow-x: clip;')
+        self.assertContains(response, '.section-pad .row.g-5')
 
     def test_signed_in_user_is_sent_to_their_role_dashboard(self):
         user = User.objects.create_user(username='home-user', password='test-password')
@@ -385,6 +579,12 @@ class LoginPageTests(TestCase):
         response = self.client.get(reverse('profile'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'navbar-account-toggle')
+        self.assertContains(response, 'navbar-account-menu')
+        self.assertContains(response, 'Staff ID')
+        self.assertContains(response, 'navbar-user')
+        self.assertContains(response, 'navbar-account-logout')
+        self.assertContains(response, 'My Profile')
         self.assertContains(response, 'Log out')
         self.assertContains(response, f'action="{reverse("logout")}"')
         self.assertContains(response, 'name="csrfmiddlewaretoken"')
@@ -454,6 +654,163 @@ class AccountProfileTests(TestCase):
         self.assertRedirects(response, reverse('profile'))
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('New-secure-password-123!'))
+
+
+class AuditLogAccessTests(TestCase):
+    def setUp(self):
+        self.hr_user = User.objects.create_user(
+            username='audit-hr',
+            password='test-password',
+        )
+        EmployeeProfile.objects.create(user=self.hr_user, role='HR')
+        self.superadmin = User.objects.create_superuser(
+            username='audit-superadmin',
+            email='superadmin@example.com',
+            password='test-password',
+        )
+
+    def test_profile_changes_record_actor_and_request_ip(self):
+        self.client.force_login(self.hr_user)
+
+        response = self.client.post(reverse('profile'), {
+            'first_name': 'Audit',
+            'last_name': 'User',
+            'email': 'audit@example.com',
+            'title': '',
+            'other_title': '',
+            'other_names': '',
+            'gender': '',
+            'job_title': 'Audit Officer',
+            'appointment_to_present_grade_date': '',
+        }, REMOTE_ADDR='203.0.113.15')
+
+        self.assertRedirects(response, reverse('profile'))
+        entry = AuditLog.objects.get(
+            actor=self.hr_user,
+            model_name='app.EmployeeProfile',
+        )
+        self.assertEqual(entry.actor_username, 'audit-hr')
+        self.assertEqual(entry.actor_role, 'HR')
+        self.assertEqual(entry.ip_address, '203.0.113.15')
+        self.assertIn('job_title', entry.changes)
+        self.assertNotIn('Audit Officer', str(entry.changes))
+
+    def test_successful_login_is_audited_with_request_ip(self):
+        response = self.client.post(reverse('login'), {
+            'username': 'audit-hr',
+            'password': 'test-password',
+        }, REMOTE_ADDR='203.0.113.20')
+
+        self.assertEqual(response.status_code, 302)
+        entry = AuditLog.objects.get(actor=self.hr_user, action='login')
+        self.assertEqual(entry.ip_address, '203.0.113.20')
+
+    def test_appraisal_submission_note_names_the_assigned_supervisor(self):
+        employee_user = User.objects.create_user(
+            username='audit-employee-submitter',
+            first_name='Employee',
+            last_name='Submitter',
+            password='test-password',
+        )
+        employee = EmployeeProfile.objects.create(user=employee_user, role='Employee')
+        supervisor_user = User.objects.create_user(
+            username='audit-supervisor',
+            first_name='Casey',
+            last_name='Supervisor',
+            password='test-password',
+        )
+        supervisor = EmployeeProfile.objects.create(
+            user=supervisor_user,
+            role='Supervisor',
+        )
+        cycle = AppraisalCycle.objects.create(year=2026)
+        appraisal = Appraisal.objects.create(
+            employee=employee,
+            supervisor=supervisor,
+            cycle=cycle,
+            status='draft',
+        )
+
+        request = RequestFactory().post('/employee/submit/')
+        request.user = employee_user
+        token = set_audit_request_context(request)
+        try:
+            appraisal.status = 'pending_manager'
+            appraisal.save(update_fields=['status'])
+        finally:
+            reset_audit_request_context(token)
+
+        entry = AuditLog.objects.get(
+            model_name='app.Appraisal',
+            object_id=str(appraisal.pk),
+            action='updated',
+        )
+        self.assertEqual(
+            entry.note,
+            'Employee Submitter submitted the 2026 appraisal to supervisor Casey Supervisor.',
+        )
+
+    def test_hr_cannot_see_superadmin_audit_entries_but_superadmin_can(self):
+        AuditLog.objects.create(
+            actor=self.hr_user,
+            actor_username='audit-hr',
+            actor_role='HR',
+            action='updated',
+            model_name='app.EmployeeProfile',
+            object_id='1',
+            note='HR updated an employee profile.',
+            actor_is_superuser=False,
+        )
+        AuditLog.objects.create(
+            actor=self.superadmin,
+            actor_username='audit-superadmin',
+            action='updated',
+            model_name='app.Competency',
+            object_id='2',
+            note='Superadmin updated a competency.',
+            actor_is_superuser=True,
+        )
+
+        self.client.force_login(self.hr_user)
+        response = self.client.get(reverse('audit_log'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'audit-hr')
+        self.assertContains(response, 'HR updated an employee profile.')
+        self.assertNotContains(response, 'audit-superadmin')
+        self.assertNotContains(response, 'Superadmin updated a competency.')
+
+        self.client.force_login(self.superadmin)
+        response = self.client.get(reverse('audit_log'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'audit-hr')
+        self.assertContains(response, 'audit-superadmin')
+        self.assertContains(response, 'Superadmin updated a competency.')
+
+    def test_non_hr_users_cannot_access_audit_log(self):
+        employee = User.objects.create_user(
+            username='audit-employee',
+            password='test-password',
+        )
+        EmployeeProfile.objects.create(user=employee, role='Employee')
+        self.client.force_login(employee)
+
+        response = self.client.get(reverse('audit_log'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('dashboard_router'))
+
+    def test_audit_log_admin_is_read_only_and_superadmin_only(self):
+        audit_admin = admin.site._registry[AuditLog]
+        hr_request = RequestFactory().get('/admin/app/auditlog/')
+        hr_request.user = self.hr_user
+        superadmin_request = RequestFactory().get('/admin/app/auditlog/')
+        superadmin_request.user = self.superadmin
+
+        self.assertFalse(audit_admin.has_view_permission(hr_request))
+        self.assertTrue(audit_admin.has_view_permission(superadmin_request))
+        self.assertFalse(audit_admin.has_add_permission(superadmin_request))
+        self.assertTrue(audit_admin.has_change_permission(superadmin_request))
+        self.assertFalse(audit_admin.has_delete_permission(superadmin_request))
 
 
 class InAppNotificationTests(TestCase):
@@ -603,9 +960,8 @@ class InAppNotificationTests(TestCase):
             role='Supervisor',
             department=department,
         )
-        AssignSupervisor.objects.create(
+        DepartmentSupervisor.objects.create(
             department=department,
-            employee=self.user.profile,
             supervisor=old_supervisor,
         )
         self.client.force_login(hr_user)
@@ -613,7 +969,6 @@ class InAppNotificationTests(TestCase):
         response = self.client.post(reverse('hr_dashboard'), {
             'assignment_action': 'save',
             'department': department.id,
-            'employee': self.user.profile.id,
             'supervisor': new_supervisor.id,
         })
 
@@ -681,9 +1036,18 @@ class HRSupervisorAssignmentTests(TestCase):
             role='Supervisor',
             department=self.other_department,
         )
-        self.assignment = AssignSupervisor.objects.create(
+        self.hod = EmployeeProfile.objects.create(
+            user=User.objects.create_user(
+                username='assignment-hod',
+                password='test-password',
+            ),
+            role='HOD',
             department=self.department,
-            employee=self.employee,
+        )
+        self.hr_user.profile.department = self.department
+        self.hr_user.profile.save(update_fields=['department'])
+        self.assignment = DepartmentSupervisor.objects.create(
+            department=self.department,
             supervisor=self.old_supervisor,
         )
         cycle = AppraisalCycle.objects.create(year=2026, is_active=True)
@@ -694,7 +1058,7 @@ class HRSupervisorAssignmentTests(TestCase):
         )
         self.client.force_login(self.hr_user)
 
-    def test_options_endpoint_only_returns_people_in_selected_department(self):
+    def test_options_endpoint_returns_department_users_except_hr(self):
         response = self.client.get(
             reverse('hr_assignment_options'),
             {'department_id': self.department.id},
@@ -703,33 +1067,162 @@ class HRSupervisorAssignmentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(
-            {employee['id'] for employee in data['employees']},
-            {self.employee.id, self.old_supervisor.id, self.new_supervisor.id,
-             self.subordinate_supervisor.id},
-        )
-        self.assertEqual(
             {supervisor['id'] for supervisor in data['supervisors']},
             {
                 self.old_supervisor.id,
                 self.new_supervisor.id,
                 self.subordinate_supervisor.id,
+                self.employee.id,
+                self.hod.id,
             },
         )
         self.assertNotIn(
             self.foreign_supervisor.id,
             [supervisor['id'] for supervisor in data['supervisors']],
         )
+        self.assertNotIn(
+            self.hr_user.profile.id,
+            [supervisor['id'] for supervisor in data['supervisors']],
+        )
+
+    def test_hr_dashboard_can_assign_department_hod(self):
+        response = self.client.post(reverse('hr_dashboard'), {
+            'hod_assignment_action': 'save',
+            'department': self.department.id,
+            'hod': self.hod.id,
+        })
+
+        self.assertRedirects(response, f"{reverse('hr_dashboard')}#assignments")
+        self.assertEqual(
+            AssignDepartmentHod.objects.get(department=self.department).hod,
+            self.hod,
+        )
+
+    def test_hr_dashboard_can_assign_supervisor_reporting_line(self):
+        response = self.client.post(reverse('hr_dashboard'), {
+            'reporting_action': 'save',
+            'reporting-supervisor': self.subordinate_supervisor.id,
+            'reporting-manager': self.hod.id,
+        })
+
+        self.assertRedirects(response, f"{reverse('hr_dashboard')}#assignments")
+        self.assertEqual(
+            SupervisorReporting.objects.get(
+                supervisor=self.subordinate_supervisor,
+            ).manager,
+            self.hod,
+        )
+
+    def test_hr_dashboard_confirms_transfer_before_changing_supervisor_manager(self):
+        next_hod = EmployeeProfile.objects.create(
+            user=User.objects.create_user(
+                username='dashboard-next-hod',
+                password='test-password',
+            ),
+            role='HOD',
+            department=self.department,
+        )
+        SupervisorReporting.objects.create(
+            supervisor=self.subordinate_supervisor,
+            manager=self.hod,
+        )
+        appraisal = Appraisal.objects.create(
+            employee=self.subordinate_supervisor,
+            cycle=self.draft_appraisal.cycle,
+            supervisor=self.hod,
+            status='pending_manager',
+        )
+        assignment_data = {
+            'reporting_action': 'save',
+            'reporting-supervisor': self.subordinate_supervisor.id,
+            'reporting-manager': next_hod.id,
+        }
+
+        response = self.client.post(reverse('hr_dashboard'), assignment_data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['reporting_confirmation']['appraisal_count'], 1)
+        self.assertContains(response, 'Confirm supervisor transfer')
+        self.assertEqual(
+            SupervisorReporting.objects.get(
+                supervisor=self.subordinate_supervisor,
+            ).manager,
+            self.hod,
+        )
+
+        response = self.client.post(reverse('hr_dashboard'), {
+            **assignment_data,
+            'confirm_transfer': '1',
+        })
+
+        self.assertRedirects(response, f"{reverse('hr_dashboard')}#assignments")
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.supervisor, next_hod)
+        self.assertEqual(
+            SupervisorReporting.objects.get(
+                supervisor=self.subordinate_supervisor,
+            ).manager,
+            next_hod,
+        )
+
+    def test_hr_dashboard_assignment_section_includes_mobile_table_scrolling(self):
+        response = self.client.get(reverse('hr_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Assign or Change Department HOD')
+        self.assertContains(response, 'Assign or Change a Supervisor’s HOD')
+        self.assertContains(response, 'Current Supervisor Reporting Lines')
+        self.assertContains(
+            response,
+            '.hr-sidebar-nav { display: grid; gap: .55rem; grid-template-columns: minmax(0, 1fr); }',
+        )
+        self.assertContains(response, 'transform: translateX(-105%)')
+        self.assertContains(response, 'hr-sidebar-backdrop')
+        self.assertContains(response, '.hr-sidebar-brand { display: none; }')
+        self.assertContains(response, 'hr-sidebar-drawer-brand')
+        self.assertContains(response, 'Mathias Catholic Hospital<small>HR WORKSPACE</small>')
+        self.assertContains(response, 'data-sidebar-close')
+        self.assertContains(response, '.hr-dashboard-content { padding: 4.75rem 1.1rem 1.1rem; }')
+        self.assertContains(response, 'top: 4.5rem;')
+        self.assertContains(response, "event.key === 'Escape'")
+        self.assertContains(response, 'overflow-x: auto')
+        self.assertContains(response, 'min-width: 720px')
+
+    def test_hr_dashboard_mobile_navigation_is_vertical_and_collapsible(self):
+        response = self.client.get(reverse('hr_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'grid-template-columns: minmax(0, 1fr)')
+        self.assertContains(response, 'transform: translateX(-105%)')
+        self.assertContains(response, 'hr-sidebar-backdrop')
+        self.assertContains(response, "event.key === 'Escape'")
+        self.assertContains(response, 'navigation.inert = mobile && !expanded')
+        self.assertContains(response, 'aria-expanded="false"')
+        self.assertContains(response, '.hr-sidebar-brand { display: none; }')
+        self.assertContains(response, 'Mathias Catholic Hospital<small>HR WORKSPACE</small>')
+        self.assertContains(response, 'data-sidebar-close')
+        self.assertContains(response, 'top: 4.5rem;')
+
+    def test_hr_can_assign_an_employee_as_department_reviewer(self):
+        response = self.client.post(reverse('hr_supervisor_assignments'), {
+            'department': self.department.id,
+            'supervisor': self.employee.id,
+        })
+
+        self.assertRedirects(response, reverse('hr_supervisor_assignments'))
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.supervisor, self.employee)
 
     def test_search_endpoint_filters_staff_id_department_and_related_names(self):
         response = self.client.get(
             reverse('hr_search_supervisor_assignments'),
-            {'q': 'assigned-employee'},
+            {'q': 'Human Resources'},
         )
 
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data['total'], 1)
-        self.assertEqual(data['results'][0]['employee_staff_id'], 'assigned-employee')
+        self.assertEqual(data['results'][0]['department'], 'Human Resources')
 
         response = self.client.get(
             reverse('hr_search_supervisor_assignments'),
@@ -738,28 +1231,25 @@ class HRSupervisorAssignmentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['total'], 0)
 
-        response = self.client.get(
-            reverse('hr_search_supervisor_assignments'),
-            {'q': 'old-supervisor'},
-        )
+        response = self.client.get(reverse('hr_search_supervisor_assignments'), {'q': 'old-supervisor'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['total'], 1)
 
     def test_search_endpoint_paginates_and_is_hr_only(self):
         for index in range(26):
+            department = Department.objects.create(name=f'Page Department {index:02}')
             user = User.objects.create_user(
-                username=f'page-employee-{index:02}',
+                username=f'page-supervisor-{index:02}',
                 password='test-password',
             )
-            employee = EmployeeProfile.objects.create(
+            supervisor = EmployeeProfile.objects.create(
                 user=user,
-                role='Employee',
-                department=self.department,
+                role='Supervisor',
+                department=department,
             )
-            AssignSupervisor.objects.create(
-                department=self.department,
-                employee=employee,
-                supervisor=self.old_supervisor,
+            DepartmentSupervisor.objects.create(
+                department=department,
+                supervisor=supervisor,
             )
 
         response = self.client.get(reverse('hr_search_supervisor_assignments'))
@@ -774,18 +1264,48 @@ class HRSupervisorAssignmentTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_hr_can_change_assignment_and_update_draft_appraisal(self):
+        coworker_user = User.objects.create_user(
+            username='assigned-coworker',
+            password='test-password',
+        )
+        coworker = EmployeeProfile.objects.create(
+            user=coworker_user,
+            role='Employee',
+            department=self.department,
+        )
+        coworker_appraisal = Appraisal.objects.create(
+            employee=coworker,
+            cycle=self.draft_appraisal.cycle,
+            status='draft',
+        )
+        active_appraisal = Appraisal.objects.create(
+            employee=self.subordinate_supervisor,
+            cycle=self.draft_appraisal.cycle,
+            supervisor=self.old_supervisor,
+            status='pending_manager',
+        )
+        returned_appraisal = Appraisal.objects.create(
+            employee=self.employee,
+            cycle=AppraisalCycle.objects.create(year=2027),
+            supervisor=self.old_supervisor,
+            status='returned_employee',
+        )
         response = self.client.post(reverse('hr_supervisor_assignments'), {
             'department': self.department.id,
-            'employee': self.employee.id,
             'supervisor': self.new_supervisor.id,
         })
 
         self.assertRedirects(response, reverse('hr_supervisor_assignments'))
-        assignments = AssignSupervisor.objects.filter(employee=self.employee)
-        self.assertEqual(assignments.count(), 1)
-        self.assertEqual(assignments.get().supervisor, self.new_supervisor)
+        self.assignment.refresh_from_db()
+        self.assertEqual(self.assignment.supervisor, self.new_supervisor)
         self.draft_appraisal.refresh_from_db()
         self.assertEqual(self.draft_appraisal.supervisor, self.new_supervisor)
+        coworker_appraisal.refresh_from_db()
+        self.assertEqual(coworker_appraisal.supervisor, self.new_supervisor)
+        active_appraisal.refresh_from_db()
+        self.assertEqual(active_appraisal.supervisor, self.old_supervisor)
+        returned_appraisal.refresh_from_db()
+        self.assertEqual(returned_appraisal.supervisor, self.old_supervisor)
 
     def test_dashboard_quick_access_can_update_supervisor_assignment(self):
         response = self.client.get(reverse('hr_dashboard'))
@@ -796,13 +1316,12 @@ class HRSupervisorAssignmentTests(TestCase):
         response = self.client.post(reverse('hr_dashboard'), {
             'assignment_action': 'save',
             'department': self.department.id,
-            'employee': self.employee.id,
             'supervisor': self.new_supervisor.id,
         })
 
         self.assertRedirects(response, f"{reverse('hr_dashboard')}#assignments")
         self.assertEqual(
-            AssignSupervisor.objects.get(employee=self.employee).supervisor,
+            DepartmentSupervisor.objects.get(department=self.department).supervisor,
             self.new_supervisor,
         )
         self.draft_appraisal.refresh_from_db()
@@ -818,7 +1337,6 @@ class HRSupervisorAssignmentTests(TestCase):
         response = self.client.post(reverse('hr_dashboard'), {
             'assignment_action': 'save',
             'department': self.department.id,
-            'employee': self.employee.id,
             'supervisor': self.new_supervisor.id,
         })
 
@@ -826,7 +1344,7 @@ class HRSupervisorAssignmentTests(TestCase):
         self.assertContains(response, 'Confirm appraisal transfer')
         self.assertContains(response, 'data-has-errors="true"')
         self.assertEqual(
-            AssignSupervisor.objects.get(employee=self.employee).supervisor,
+            DepartmentSupervisor.objects.get(department=self.department).supervisor,
             self.old_supervisor,
         )
         active_appraisal.refresh_from_db()
@@ -865,7 +1383,6 @@ class HRSupervisorAssignmentTests(TestCase):
 
         assignment_data = {
             'department': self.department.id,
-            'employee': self.employee.id,
             'supervisor': self.new_supervisor.id,
         }
         response = self.client.post(reverse('hr_supervisor_assignments'), assignment_data)
@@ -874,7 +1391,7 @@ class HRSupervisorAssignmentTests(TestCase):
         self.assertContains(response, 'Confirm appraisal transfer')
         self.assertContains(response, '2 in-progress')
         self.assertEqual(
-            AssignSupervisor.objects.get(employee=self.employee).supervisor,
+            DepartmentSupervisor.objects.get(department=self.department).supervisor,
             self.old_supervisor,
         )
         pending_appraisal.refresh_from_db()
@@ -887,7 +1404,7 @@ class HRSupervisorAssignmentTests(TestCase):
 
         self.assertRedirects(response, reverse('hr_supervisor_assignments'))
         self.assertEqual(
-            AssignSupervisor.objects.get(employee=self.employee).supervisor,
+            DepartmentSupervisor.objects.get(department=self.department).supervisor,
             self.new_supervisor,
         )
         pending_appraisal.refresh_from_db()
@@ -913,41 +1430,122 @@ class HRSupervisorAssignmentTests(TestCase):
         self.old_supervisor.refresh_from_db()
         self.assertEqual(self.old_supervisor.role, 'Employee')
 
-    def test_hr_can_assign_a_supervisor_to_another_supervisor(self):
+    def test_hr_can_assign_an_hod_to_supervise_a_supervisor(self):
         response = self.client.post(reverse('hr_supervisor_assignments'), {
-            'department': self.department.id,
-            'employee': self.subordinate_supervisor.id,
-            'supervisor': self.new_supervisor.id,
+            'reporting_action': 'save',
+            'reporting-supervisor': self.subordinate_supervisor.id,
+            'reporting-manager': self.hod.id,
         })
 
         self.assertRedirects(response, reverse('hr_supervisor_assignments'))
-        assignment = AssignSupervisor.objects.get(employee=self.subordinate_supervisor)
-        self.assertEqual(assignment.supervisor, self.new_supervisor)
+        assignment = SupervisorReporting.objects.get(supervisor=self.subordinate_supervisor)
+        self.assertEqual(assignment.manager, self.hod)
+
+    def test_hr_confirms_supervisor_reporting_transfer_and_preserves_returned_reviewers(self):
+        new_hod = EmployeeProfile.objects.create(
+            user=User.objects.create_user(
+                username='replacement-hod',
+                password='test-password',
+            ),
+            role='HOD',
+            department=self.department,
+        )
+        SupervisorReporting.objects.create(
+            supervisor=self.subordinate_supervisor,
+            manager=self.hod,
+        )
+        draft_appraisal = Appraisal.objects.create(
+            employee=self.subordinate_supervisor,
+            cycle=AppraisalCycle.objects.create(year=2027),
+            supervisor=self.hod,
+            status='draft',
+        )
+        active_appraisal = Appraisal.objects.create(
+            employee=self.subordinate_supervisor,
+            cycle=AppraisalCycle.objects.create(year=2028),
+            supervisor=self.hod,
+            status='pending_manager',
+        )
+        returned_appraisal = Appraisal.objects.create(
+            employee=self.subordinate_supervisor,
+            cycle=AppraisalCycle.objects.create(year=2029),
+            supervisor=self.hod,
+            status='returned_employee',
+        )
+        assignment_data = {
+            'reporting_action': 'save',
+            'reporting-supervisor': self.subordinate_supervisor.id,
+            'reporting-manager': new_hod.id,
+        }
+
+        response = self.client.post(
+            reverse('hr_supervisor_assignments'),
+            assignment_data,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['transfer_confirmation']['appraisal_count'],
+            1,
+        )
+        active_appraisal.refresh_from_db()
+        self.assertEqual(active_appraisal.supervisor, self.hod)
+
+        response = self.client.post(
+            reverse('hr_supervisor_assignments'),
+            {**assignment_data, 'confirm_transfer': '1'},
+        )
+
+        self.assertRedirects(response, reverse('hr_supervisor_assignments'))
+        self.assertEqual(
+            SupervisorReporting.objects.get(
+                supervisor=self.subordinate_supervisor,
+            ).manager,
+            new_hod,
+        )
+        draft_appraisal.refresh_from_db()
+        active_appraisal.refresh_from_db()
+        returned_appraisal.refresh_from_db()
+        self.assertEqual(draft_appraisal.supervisor, new_hod)
+        self.assertEqual(active_appraisal.supervisor, new_hod)
+        self.assertEqual(returned_appraisal.supervisor, self.hod)
 
     def test_hr_cannot_assign_a_supervisor_to_themselves(self):
         response = self.client.post(reverse('hr_supervisor_assignments'), {
-            'department': self.department.id,
-            'employee': self.subordinate_supervisor.id,
-            'supervisor': self.subordinate_supervisor.id,
+            'reporting_action': 'save',
+            'reporting-supervisor': self.subordinate_supervisor.id,
+            'reporting-manager': self.subordinate_supervisor.id,
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'A supervisor cannot be assigned to themselves.')
+        self.assertContains(response, 'Select a valid choice.')
         self.assertFalse(
-            AssignSupervisor.objects.filter(employee=self.subordinate_supervisor).exists()
+            SupervisorReporting.objects.filter(supervisor=self.subordinate_supervisor).exists()
+        )
+
+    def test_hr_cannot_assign_a_supervisor_as_another_supervisors_manager(self):
+        response = self.client.post(reverse('hr_supervisor_assignments'), {
+            'reporting_action': 'save',
+            'reporting-supervisor': self.new_supervisor.id,
+            'reporting-manager': self.subordinate_supervisor.id,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Select a valid choice.')
+        self.assertFalse(
+            SupervisorReporting.objects.filter(supervisor=self.new_supervisor).exists()
         )
 
     def test_hr_cannot_assign_supervisor_from_another_department(self):
         response = self.client.post(reverse('hr_supervisor_assignments'), {
             'department': self.department.id,
-            'employee': self.employee.id,
             'supervisor': self.foreign_supervisor.id,
         })
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Choose a supervisor from the selected department.')
+        self.assertContains(response, 'Choose a department reviewer from the selected department.')
         self.assertEqual(
-            AssignSupervisor.objects.filter(employee=self.employee).get().supervisor,
+            DepartmentSupervisor.objects.get(department=self.department).supervisor,
             self.old_supervisor,
         )
 
@@ -1116,9 +1714,8 @@ class HRCompletedAppraisalTests(TestCase):
         )
 
     def test_hr_cannot_change_supervisor_role_before_reassigning_workload(self):
-        assignment = AssignSupervisor.objects.create(
+        assignment = DepartmentSupervisor.objects.create(
             department=self.department,
-            employee=self.employee,
             supervisor=self.supervisor,
         )
         active_appraisal = Appraisal.objects.create(
@@ -1142,7 +1739,7 @@ class HRCompletedAppraisalTests(TestCase):
         self.assertEqual(assignment.supervisor, self.supervisor)
         self.assertContains(response, 'Reassign the following supervisor workload')
         self.assertContains(response, '1 appraisal(s) awaiting review')
-        self.assertContains(response, 'employee assignments')
+        self.assertContains(response, 'department or supervisor reporting assignments')
 
     def test_hr_cannot_assign_hr_role_or_update_an_hr_profile(self):
         response = self.client.post(reverse('hr_dashboard'), {
@@ -1320,9 +1917,8 @@ class EmployeeCompetencySelectionTests(TestCase):
                 description='Organize work and manage workload systematically.',
             ),
         ]
-        AssignSupervisor.objects.create(
+        DepartmentSupervisor.objects.create(
             department=self.department,
-            employee=self.employee,
             supervisor=self.supervisor,
         )
         self.client.force_login(self.employee_user)
@@ -1343,6 +1939,28 @@ class EmployeeCompetencySelectionTests(TestCase):
         self.assertEqual(response.content.decode().count('<h3>Communication</h3>'), 1)
         self.assertContains(response, '01/01/2026')
         self.assertContains(response, '31/12/2026')
+
+    def test_competency_selection_uses_admin_display_order(self):
+        planning = Competency.objects.create(
+            name='Planning first',
+            competency_type='core',
+            display_order=1,
+            description='Plan work.',
+        )
+        self.competencies[0].display_order = 2
+        self.competencies[0].save(update_fields=['display_order'])
+
+        form = EmployeeCompetencySelectionForm()
+        core_names = [
+            group['competency'].name
+            for group in form.competency_groups
+            if group['competency'].competency_type == 'core'
+        ]
+
+        self.assertLess(
+            core_names.index(planning.name),
+            core_names.index(self.competencies[0].name),
+        )
 
     def competency_selection_data(self, competency_ids):
         return {
@@ -1676,7 +2294,7 @@ class SupervisorDashboardOwnAppraisalVisibilityTests(TestCase):
         )
         self.manager = EmployeeProfile.objects.create(
             user=manager_user,
-            role='Supervisor',
+            role='HOD',
             department=self.department,
         )
         self.client.force_login(supervisor_user)
@@ -1692,10 +2310,9 @@ class SupervisorDashboardOwnAppraisalVisibilityTests(TestCase):
         ).exists())
 
     def test_own_appraisal_is_shown_when_a_supervisor_is_assigned(self):
-        AssignSupervisor.objects.create(
-            department=self.department,
-            employee=self.supervisor,
-            supervisor=self.manager,
+        SupervisorReporting.objects.create(
+            supervisor=self.supervisor,
+            manager=self.manager,
         )
 
         response = self.client.get(reverse('supervisor_dashboard'))
@@ -1703,6 +2320,138 @@ class SupervisorDashboardOwnAppraisalVisibilityTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'My Own Appraisal')
         self.assertEqual(response.context['my_appraisal'].employee, self.supervisor)
+
+    def test_previous_cycle_own_appraisal_can_be_opened_and_edited(self):
+        SupervisorReporting.objects.create(
+            supervisor=self.supervisor,
+            manager=self.manager,
+        )
+        previous_cycle = AppraisalCycle.objects.create(year=2025, is_active=False)
+
+        response = self.client.get(reverse('supervisor_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        previous_appraisal = Appraisal.objects.get(
+            employee=self.supervisor,
+            cycle=previous_cycle,
+        )
+        self.assertIn(previous_appraisal, response.context['my_appraisals'])
+        self.assertContains(
+            response,
+            reverse('fill_targets_year', args=[previous_cycle.year]),
+        )
+
+        form_response = self.client.get(
+            reverse('fill_targets_year', args=[previous_cycle.year]),
+        )
+        self.assertEqual(form_response.status_code, 200)
+        self.assertFalse(form_response.context['read_only'])
+
+
+class ReviewerAppraisalDashboardNavigationTests(TestCase):
+    def setUp(self):
+        self.cycle = AppraisalCycle.objects.create(year=2026, is_active=True)
+        department = Department.objects.create(name='Operations')
+        employee_user = User.objects.create_user(
+            username='navigation-employee',
+            password='test-password',
+        )
+        self.employee = EmployeeProfile.objects.create(
+            user=employee_user,
+            role='Employee',
+            department=department,
+        )
+        supervisor_user = User.objects.create_user(
+            username='navigation-supervisor',
+            password='test-password',
+        )
+        self.supervisor = EmployeeProfile.objects.create(
+            user=supervisor_user,
+            role='Supervisor',
+            department=department,
+        )
+        hod_user = User.objects.create_user(
+            username='navigation-hod',
+            password='test-password',
+        )
+        self.hod = EmployeeProfile.objects.create(
+            user=hod_user,
+            role='HOD',
+            department=department,
+        )
+
+    def test_supervisor_appraisal_view_links_back_to_supervisor_dashboard(self):
+        appraisal = Appraisal.objects.create(
+            employee=self.employee,
+            supervisor=self.supervisor,
+            cycle=self.cycle,
+            status='pending_manager',
+        )
+        self.client.force_login(self.supervisor.user)
+
+        response = self.client.get(
+            reverse('supervisor_view_appraisal', args=[appraisal.id]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("supervisor_dashboard")}"',
+        )
+
+    def test_supervisor_own_goal_form_links_back_to_supervisor_dashboard(self):
+        self.client.force_login(self.supervisor.user)
+
+        response = self.client.get(reverse('fill_targets'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("supervisor_dashboard")}"',
+        )
+
+    def test_hod_appraisal_view_links_back_to_hod_dashboard(self):
+        appraisal = Appraisal.objects.create(
+            employee=self.employee,
+            supervisor=self.supervisor,
+            hod=self.hod,
+            cycle=self.cycle,
+            status='pending_hod',
+        )
+        self.client.force_login(self.hod.user)
+
+        response = self.client.get(
+            reverse('hod_view_appraisal', args=[appraisal.id]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("hod_dashboard")}"',
+        )
+
+    def test_hod_can_open_and_edit_own_previous_cycle_appraisal(self):
+        previous_cycle = AppraisalCycle.objects.create(year=2025, is_active=False)
+        self.client.force_login(self.hod.user)
+
+        response = self.client.get(reverse('hod_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        previous_appraisal = Appraisal.objects.get(
+            employee=self.hod,
+            cycle=previous_cycle,
+        )
+        self.assertIn(previous_appraisal, response.context['my_appraisals'])
+        self.assertContains(
+            response,
+            reverse('fill_targets_year', args=[previous_cycle.year]),
+        )
+
+        form_response = self.client.get(
+            reverse('fill_targets_year', args=[previous_cycle.year]),
+        )
+        self.assertEqual(form_response.status_code, 200)
+        self.assertFalse(form_response.context['read_only'])
 
 
 class SupervisorCreateAppraisalTests(TestCase):
@@ -1726,12 +2475,11 @@ class SupervisorCreateAppraisalTests(TestCase):
                 role='Employee',
                 department=department,
             )
-            AssignSupervisor.objects.create(
-                department=department,
-                employee=employee,
-                supervisor=self.supervisor,
-            )
             self.employees.append(employee)
+        DepartmentSupervisor.objects.create(
+            department=department,
+            supervisor=self.supervisor,
+        )
         self.client.force_login(supervisor_user)
 
     def test_supervisor_can_create_for_one_employee_then_all_assigned_employees(self):
@@ -1825,7 +2573,7 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
             'targets-0-mid_year_progress': 'achieved',
             'targets-0-mid_year_remark': '',
             'targets-0-end_year_assessment': '',
-            'targets-0-end_year_weight': '5',
+            'targets-0-end_year_weight': '1',
             'targets-0-end_year_score': target_score,
             'targets-0-end_year_comment': '',
             'competency_scores-TOTAL_FORMS': '1',
@@ -1833,7 +2581,7 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
             'competency_scores-MIN_NUM_FORMS': '0',
             'competency_scores-MAX_NUM_FORMS': '1000',
             'competency_scores-0-id': str(self.competency_score.id),
-            'competency_scores-0-mid_year_progress': 'demonstrated',
+            'competency_scores-0-mid_year_progress': 'well_exhibited',
             'competency_scores-0-mid_year_remark': '',
             'statement_scores-TOTAL_FORMS': '1',
             'statement_scores-INITIAL_FORMS': '1',
@@ -1853,6 +2601,7 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
         self.target.refresh_from_db()
         self.statement_score.refresh_from_db()
         self.assertEqual(self.target.mid_year_progress, 'achieved')
+        self.assertEqual(self.target.end_year_weight, 5)
         self.assertEqual(self.target.end_year_score, 4)
         self.assertEqual(self.statement_score.end_year_score, 5)
 
@@ -1861,8 +2610,142 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Target achieved')
-        self.assertContains(response, 'End-year score:</strong> 4')
-        self.assertContains(response, 'End-year score:</strong> 5')
+        self.assertContains(response, '>4</td>')
+        self.assertContains(response, '>5</td>')
+        self.assertNotContains(response, 'End-year score:</strong>')
+
+    def test_supervisor_review_uses_midyear_options_and_fixed_target_weight(self):
+        response = self.client.get(
+            reverse('supervisor_review', args=[self.appraisal.id]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for label in (
+            'Fairly exhibited',
+            'Poorly exhibited',
+            'Well exhibited',
+            'Excellently exhibited',
+            'Exceptionally exhibited',
+            'Maintain competency',
+            'Change competency',
+        ):
+            self.assertContains(response, label)
+        self.assertContains(response, 'score-radio-options')
+        self.assertContains(response, 'flex-wrap: nowrap')
+        self.assertContains(response, '<td>5</td>')
+        self.assertNotContains(response, 'name="targets-0-end_year_weight"')
+
+    def test_employee_role_department_reviewer_can_score_and_submit_to_hod(self):
+        reviewer_user = User.objects.create_user(
+            username='employee-role-reviewer',
+            password='test-password',
+        )
+        reviewer = EmployeeProfile.objects.create(
+            user=reviewer_user,
+            role='Employee',
+            department=self.employee.department,
+        )
+        DepartmentSupervisor.objects.create(
+            department=self.employee.department,
+            supervisor=reviewer,
+        )
+        hod_user = User.objects.create_user(
+            username='employee-reviewer-hod',
+            password='test-password',
+        )
+        hod = EmployeeProfile.objects.create(
+            user=hod_user,
+            role='HOD',
+            department=self.employee.department,
+        )
+        AssignDepartmentHod.objects.create(
+            department=self.employee.department,
+            hod=hod,
+        )
+        self.appraisal.supervisor = reviewer
+        self.appraisal.supervisor_comments = 'The employee met expectations.'
+        self.appraisal.assessment_decision = 'suitable'
+        self.appraisal.save(update_fields=[
+            'supervisor',
+            'supervisor_comments',
+            'assessment_decision',
+        ])
+        self.target.end_year_score = 4
+        self.target.save(update_fields=['end_year_score'])
+        self.statement_score.end_year_score = 5
+        self.statement_score.save(update_fields=['end_year_score'])
+        self.client.force_login(reviewer_user)
+
+        dashboard_response = self.client.get(reverse('dashboard_router'))
+        self.assertRedirects(dashboard_response, reverse('supervisor_dashboard'))
+        response = self.client.get(
+            reverse('supervisor_review', args=[self.appraisal.id]),
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            reverse('supervisor_submit_to_hod', args=[self.appraisal.id]),
+        )
+
+        self.assertRedirects(response, reverse('supervisor_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_hod')
+        self.assertEqual(self.appraisal.hod, hod)
+
+    def test_hod_department_reviewer_can_review_in_hod_dashboard(self):
+        reviewer = EmployeeProfile.objects.create(
+            user=User.objects.create_user(
+                username='hod-department-reviewer',
+                password='test-password',
+            ),
+            role='HOD',
+            department=self.employee.department,
+        )
+        DepartmentSupervisor.objects.create(
+            department=self.employee.department,
+            supervisor=reviewer,
+        )
+        next_hod = EmployeeProfile.objects.create(
+            user=User.objects.create_user(
+                username='next-hod-reviewer',
+                password='test-password',
+            ),
+            role='HOD',
+            department=self.employee.department,
+        )
+        AssignDepartmentHod.objects.create(
+            department=self.employee.department,
+            hod=next_hod,
+        )
+        self.appraisal.supervisor = reviewer
+        self.appraisal.supervisor_comments = 'The employee met expectations.'
+        self.appraisal.assessment_decision = 'suitable'
+        self.appraisal.save(update_fields=[
+            'supervisor',
+            'supervisor_comments',
+            'assessment_decision',
+        ])
+        self.target.end_year_score = 4
+        self.target.save(update_fields=['end_year_score'])
+        self.statement_score.end_year_score = 5
+        self.statement_score.save(update_fields=['end_year_score'])
+        self.client.force_login(reviewer.user)
+
+        dashboard_response = self.client.get(reverse('hod_dashboard'))
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertContains(dashboard_response, 'Score appraisal')
+        review_response = self.client.get(
+            reverse('supervisor_review', args=[self.appraisal.id]),
+        )
+        self.assertEqual(review_response.status_code, 200)
+        response = self.client.post(
+            reverse('supervisor_submit_to_hod', args=[self.appraisal.id]),
+        )
+
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        self.appraisal.refresh_from_db()
+        self.assertEqual(self.appraisal.status, 'pending_hod')
+        self.assertEqual(self.appraisal.hod, next_hod)
 
     def test_invalid_target_score_is_not_saved_and_validation_is_shown(self):
         response = self.client.post(
@@ -1879,6 +2762,12 @@ class SupervisorReviewScoreVisibilityTests(TestCase):
         self.assertIsNone(self.target.mid_year_progress)
 
     def test_supervisor_cannot_submit_with_unscored_target_or_statement(self):
+        self.appraisal.supervisor_comments = 'The review is complete.'
+        self.appraisal.assessment_decision = 'suitable'
+        self.appraisal.save(update_fields=[
+            'supervisor_comments',
+            'assessment_decision',
+        ])
         submit_url = reverse('supervisor_submit_to_hod', args=[self.appraisal.id])
         response = self.client.post(submit_url, follow=True)
 
@@ -2070,9 +2959,8 @@ class AppraisalReturnWorkflowTests(TestCase):
             statement=competency.description_items[0],
             end_year_score=4,
         )
-        AssignSupervisor.objects.create(
+        DepartmentSupervisor.objects.create(
             department=self.department,
-            employee=self.employee,
             supervisor=self.supervisor,
         )
         AssignDepartmentHod.objects.create(
@@ -2108,26 +2996,22 @@ class AppraisalReturnWorkflowTests(TestCase):
 
     def test_employee_can_correct_and_resubmit_to_original_supervisor(self):
         self.appraisal.status = 'returned_employee'
+        self.cycle.is_active = False
+        self.cycle.save(update_fields=['is_active'])
         self.appraisal.save(update_fields=['status'])
         competency = Competency.objects.create(
             name='Accuracy',
             competency_type='core',
             description='Check information carefully.',
         )
+        self.appraisal.employee_comments = 'I achieved my service goals.'
+        self.appraisal.competency_scores.create(competency=competency)
+        self.appraisal.save(update_fields=['employee_comments'])
         self.client.force_login(self.employee_user)
 
-        response = self.client.post(reverse('fill_targets'), {
-            'targets-TOTAL_FORMS': '5',
-            'targets-INITIAL_FORMS': '0',
-            'targets-MIN_NUM_FORMS': '0',
-            'targets-MAX_NUM_FORMS': '5',
-            'trainings-TOTAL_FORMS': '4',
-            'trainings-INITIAL_FORMS': '0',
-            'trainings-MIN_NUM_FORMS': '0',
-            'trainings-MAX_NUM_FORMS': '4',
-            'competencies': [str(competency.id)],
-            'action': 'submit',
-        })
+        response = self.client.post(
+            reverse('submit_to_supervisor', args=[self.appraisal.id]),
+        )
 
         self.assertRedirects(response, reverse('employee_dashboard'))
         self.appraisal.refresh_from_db()
@@ -2137,7 +3021,13 @@ class AppraisalReturnWorkflowTests(TestCase):
 
     def test_hod_returns_to_supervisor_and_supervisor_can_resubmit(self):
         self.appraisal.status = 'pending_hod'
-        self.appraisal.save(update_fields=['status'])
+        self.appraisal.supervisor_comments = 'The employee met expectations.'
+        self.appraisal.assessment_decision = 'suitable'
+        self.appraisal.save(update_fields=[
+            'status',
+            'supervisor_comments',
+            'assessment_decision',
+        ])
         self.client.force_login(self.hod_user)
 
         response = self.client.post(
@@ -2167,6 +3057,175 @@ class AppraisalReturnWorkflowTests(TestCase):
         self.assertTrue(AppNotification.objects.filter(
             recipient=self.hod_user,
             title='Appraisal awaiting your review',
+        ).exists())
+
+    def test_supervisor_own_appraisal_routes_to_hod_and_hod_can_return_it(self):
+        SupervisorReporting.objects.create(
+            supervisor=self.supervisor,
+            manager=self.hod,
+        )
+        appraisal = Appraisal.objects.create(
+            employee=self.supervisor,
+            cycle=self.cycle,
+            status='draft',
+            employee_comments='I completed my annual objectives.',
+        )
+        AppraisalTarget.objects.create(
+            appraisal=appraisal,
+            key_result_area='Improve service delivery',
+            target_description='Meet all service targets.',
+        )
+        competency = Competency.objects.create(
+            name='Leadership',
+            competency_type='core',
+            description='Support the team.',
+        )
+        appraisal.competency_scores.create(competency=competency)
+
+        self.client.force_login(self.supervisor_user)
+        response = self.client.post(
+            reverse('submit_to_supervisor', args=[appraisal.id]),
+        )
+
+        self.assertRedirects(response, reverse('employee_dashboard'))
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.status, 'pending_manager')
+        self.assertEqual(appraisal.supervisor, self.hod)
+
+        self.client.force_login(self.hod_user)
+        response = self.client.post(
+            reverse('return_appraisal', args=[appraisal.id]),
+            {'comment': 'Please clarify the reported outcomes.'},
+        )
+
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.status, 'returned_employee')
+        self.assertTrue(AppNotification.objects.filter(
+            recipient=self.supervisor_user,
+            title='Appraisal returned for updates',
+        ).exists())
+
+    def test_hod_own_appraisal_submits_directly_to_hr(self):
+        appraisal = Appraisal.objects.create(
+            employee=self.hod,
+            cycle=self.cycle,
+            status='draft',
+            employee_comments='I completed my annual objectives.',
+        )
+        AppraisalTarget.objects.create(
+            appraisal=appraisal,
+            key_result_area='Improve service delivery',
+            target_description='Meet all service targets.',
+        )
+        competency = Competency.objects.create(
+            name='Leadership',
+            competency_type='core',
+            description='Support the team.',
+        )
+        competency_score = appraisal.competency_scores.create(competency=competency)
+        statement_score = competency_score.statement_scores.create(
+            statement_index=0,
+            statement='Support the team.',
+        )
+
+        self.client.force_login(self.hod_user)
+        response = self.client.post(
+            reverse('submit_to_supervisor', args=[appraisal.id]),
+        )
+
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.status, 'pending_hr')
+        self.assertTrue(AppNotification.objects.filter(
+            recipient=self.hr_user,
+            title='Appraisal awaiting HR approval',
+        ).exists())
+
+        self.client.force_login(self.hr_user)
+        response = self.client.get(reverse('hr_approve', args=[appraisal.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'HOD’s signature:')
+        self.assertContains(response, self.hod_user.username)
+        self.assertContains(response, 'Save HOD Scores')
+        self.assertContains(response, 'HR Assessment of HOD Targets')
+        self.assertNotContains(response, 'Mid-year progress')
+
+        response = self.client.post(
+            reverse('hr_approve', args=[appraisal.id]),
+            {
+                'action': 'save_hod_scores',
+                'hod_targets-TOTAL_FORMS': '1',
+                'hod_targets-INITIAL_FORMS': '1',
+                'hod_targets-MIN_NUM_FORMS': '0',
+                'hod_targets-MAX_NUM_FORMS': '1000',
+                f'hod_targets-0-id': str(appraisal.targets.get().id),
+                'hod_targets-0-end_year_assessment': 'completed',
+                'hod_targets-0-end_year_weight': '5',
+                'hod_targets-0-end_year_score': '4',
+                'hod_targets-0-end_year_comment': 'very_good',
+                'hod_statement_scores-TOTAL_FORMS': '1',
+                'hod_statement_scores-INITIAL_FORMS': '1',
+                'hod_statement_scores-MIN_NUM_FORMS': '0',
+                'hod_statement_scores-MAX_NUM_FORMS': '1000',
+                'hod_statement_scores-0-id': str(statement_score.id),
+                'hod_statement_scores-0-end_year_score': '5',
+            },
+        )
+        self.assertRedirects(response, reverse('hr_approve', args=[appraisal.id]))
+        appraisal.targets.get().refresh_from_db()
+        statement_score.refresh_from_db()
+        self.assertEqual(appraisal.targets.get().end_year_score, 4)
+        self.assertEqual(statement_score.end_year_score, 5)
+
+        response = self.client.post(
+            reverse('hr_approve', args=[appraisal.id]),
+            {'hr_comments': 'Approved after review.'},
+        )
+        self.assertRedirects(response, reverse('hr_dashboard'))
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.status, 'completed')
+        self.assertEqual(appraisal.overall_percentage, 78)
+
+    def test_hod_scored_supervisor_appraisal_submits_to_hr(self):
+        appraisal = Appraisal.objects.create(
+            employee=self.supervisor,
+            supervisor=self.hod,
+            cycle=self.cycle,
+            status='pending_manager',
+            supervisor_comments='The supervisor performed well.',
+            assessment_decision='suitable',
+        )
+        AppraisalTarget.objects.create(
+            appraisal=appraisal,
+            key_result_area='Improve service delivery',
+            target_description='Meet all service targets.',
+            end_year_score=4,
+        )
+        competency = Competency.objects.create(
+            name='Leadership',
+            competency_type='core',
+            description='Support the team.',
+        )
+        competency_score = appraisal.competency_scores.create(competency=competency)
+        competency_score.statement_scores.create(
+            statement_index=0,
+            statement='Support the team.',
+            end_year_score=4,
+        )
+
+        self.client.force_login(self.hod_user)
+        response = self.client.post(
+            reverse('supervisor_submit_to_hod', args=[appraisal.id]),
+        )
+
+        self.assertRedirects(response, reverse('hod_dashboard'))
+        appraisal.refresh_from_db()
+        self.assertEqual(appraisal.status, 'pending_hr')
+        self.assertEqual(appraisal.hod, self.hod)
+        self.assertTrue(AppNotification.objects.filter(
+            recipient=self.hr_user,
+            title='Appraisal awaiting HR approval',
         ).exists())
 
     def test_hod_review_shows_competency_description(self):

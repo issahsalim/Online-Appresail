@@ -1,37 +1,69 @@
-<section class="appraisal-paper" aria-labelledby="competencies-readonly-heading">
-    <h2 class="appraisal-section-title" id="competencies-readonly-heading">SECTION 3: Competencies Assessment</h2>
+<section class="appraisal-paper" aria-labelledby="core-competencies-readonly-heading">
+    <h2 class="appraisal-section-title" id="core-competencies-readonly-heading">SECTION 5: Annual Appraisal — Core Competencies</h2>
     <div class="appraisal-section-body">
-        {% for score in competencies %}
-            <h3 class="appraisal-competency-title">
-                {{ score.competency.name }}
-                <span>{{ score.competency.get_competency_type_display }}</span>
-            </h3>
-            <div class="table-responsive mb-3">
-                <table class="table table-bordered align-middle">
-                    <thead>
-                        <tr><th>Selected competency statement</th><th>Mid-year progress</th><th>Mid-year remark</th><th>End-year score (1-5)</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for statement in score.statement_scores.all %}
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr><th>Core competency statement</th><th>Weight (W)</th><th>Grade (G)</th><th>W × G</th></tr>
+                </thead>
+                <tbody>
+                    {% for group in core_score_groups %}
+                        {% for statement in group.statements %}
                             <tr>
                                 <td>{{ statement.statement }}</td>
-                                <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
-                                <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
-                                <td>{% if statement.end_year_score != None %}{{ statement.end_year_score }} / 5{% else %}Not scored yet{% endif %}</td>
+                                <td>{{ group.weight|floatformat:"1" }}</td>
+                                <td>{% if statement.score != None %}{{ statement.score }}{% else %}Not scored yet{% endif %}</td>
+                                <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
                             </tr>
                         {% empty %}
-                            <tr>
-                                <td>{% include 'appraisal/_competency_description.html' with competency=score.competency %}</td>
-                                <td>{{ score.get_mid_year_progress_display|default:"Not reviewed yet" }}</td>
-                                <td>{{ score.get_mid_year_remark_display|default:"Not reviewed yet" }}</td>
-                                <td>{% if score.end_year_score != None %}{{ score.end_year_score }} / 5{% else %}Not scored yet{% endif %}</td>
-                            </tr>
+                            <tr><td>{{ group.name }}</td><td>{{ group.weight|floatformat:"1" }}</td><td>Not scored yet</td><td>—</td></tr>
                         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% empty %}
-            <p class="mb-0">No competency statements have been selected.</p>
-        {% endfor %}
+                        {% if group.competency.description_items %}
+                            <tr><td colspan="4">{% include 'appraisal/_competency_description.html' with competency=group.competency %}</td></tr>
+                        {% endif %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-center">No core competencies have been selected.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="3">Average of all core competency groups (N)</th><td>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</td></tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="appraisal-paper" aria-labelledby="non-core-competencies-readonly-heading">
+    <h2 class="appraisal-section-title" id="non-core-competencies-readonly-heading">SECTION 5: Annual Appraisal (Continuation) — Non-Core Competencies</h2>
+    <div class="appraisal-section-body">
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead>
+                    <tr><th>Non-core competency statement</th><th>Weight (W)</th><th>Grade (G)</th><th>W × G</th></tr>
+                </thead>
+                <tbody>
+                    {% for group in non_core_score_groups %}
+                        {% for statement in group.statements %}
+                            <tr>
+                                <td>{{ statement.statement }}</td>
+                                <td>{{ group.weight|floatformat:"1" }}</td>
+                                <td>{% if statement.score != None %}{{ statement.score }}{% else %}Not scored yet{% endif %}</td>
+                                <td>{{ statement.weighted_score|floatformat:2|default:"—" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td>{{ group.name }}</td><td>{{ group.weight|floatformat:"1" }}</td><td>Not scored yet</td><td>—</td></tr>
+                        {% endfor %}
+                        {% if group.competency.description_items %}
+                            <tr><td colspan="4">{% include 'appraisal/_competency_description.html' with competency=group.competency %}</td></tr>
+                        {% endif %}
+                    {% empty %}
+                        <tr><td colspan="4" class="text-center">No non-core competencies have been selected.</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="3">Average of all non-core competency groups (O)</th><td>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</td></tr>
+                </tfoot>
+            </table>
+        </div>
     </div>
 </section>

@@ -77,24 +77,140 @@ class AppNotification(models.Model):
         return f"{self.title} for {self.recipient}"
 
 
-class AssignSupervisor(models.Model):
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='department_supervisor')
-    
-    employee = models.ForeignKey(
-        EmployeeProfile, 
-        on_delete=models.CASCADE, 
-        related_name='employee_supervisor', 
-        limit_choices_to={'role__in': ['Employee', 'Supervisor']}
+class AuditLog(models.Model):
+    ACTION_CHOICES = [
+        ('created', 'Created'),
+        ('updated', 'Updated'),
+        ('deleted', 'Deleted'),
+        ('login', 'Logged in'),
+        ('logout', 'Logged out'),
+        ('password_changed', 'Password changed'),
+    ]
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_events',
     )
-    supervisor = models.ForeignKey(
-        EmployeeProfile, 
-        on_delete=models.CASCADE, 
-        related_name='supervisor_employee', 
-        limit_choices_to={'role': 'Supervisor'}
-    ) 
+    actor_username = models.CharField(max_length=150, blank=True)
+    actor_role = models.CharField(max_length=20, blank=True)
+    actor_is_superuser = models.BooleanField(default=False)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    model_name = models.CharField(max_length=100, blank=True)
+    object_id = models.CharField(max_length=100, blank=True)
+    object_label = models.CharField(max_length=200, blank=True)
+    note = models.TextField(blank=True)
+    changes = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('employee', 'supervisor') 
+        ordering = ['-created_at', '-pk']
+        indexes = [
+            models.Index(fields=['created_at']),
+            models.Index(fields=['actor_is_superuser', 'created_at']),
+            models.Index(fields=['model_name', 'object_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_action_display()} {self.model_name} #{self.object_id}"
+
+
+class DepartmentSupervisor(models.Model):
+    department = models.OneToOneField(
+        Department,
+        on_delete=models.CASCADE,
+        related_name='supervisor_assignment',
+    )
+    supervisor = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name='led_departments',
+    )
+
+    def clean(self):
+        if self.supervisor_id and self.supervisor.role == 'HR':
+            raise ValidationError({'supervisor': 'HR users cannot be assigned as department reviewers.'})
+        if (
+            self.department_id and self.supervisor_id
+            and self.supervisor.department_id != self.department_id
+        ):
+            raise ValidationError({
+                'supervisor': 'The department supervisor must belong to that department.',
+            })
+
+    def __str__(self):
+        return f"{self.department} - {self.supervisor}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+class SupervisorReporting(models.Model):
+    supervisor = models.OneToOneField(
+        EmployeeProfile,
+        on_delete=models.CASCADE,
+        related_name='reporting_line',
+        limit_choices_to={'role': 'Supervisor'},
+    )
+    manager = models.ForeignKey(
+        EmployeeProfile,
+        on_delete=models.PROTECT,
+        related_name='direct_reports',
+        limit_choices_to={'role': 'HOD'},
+    )
+
+    def clean(self):
+        if self.supervisor_id and self.supervisor.role != 'Supervisor':
+            raise ValidationError({'supervisor': 'Choose a user with the Supervisor role.'})
+        if self.manager_id and self.manager.role != 'HOD':
+            raise ValidationError({'manager': 'Choose a user with the HOD role.'})
+        if self.supervisor_id and self.supervisor_id == self.manager_id:
+            raise ValidationError({'manager': 'A supervisor cannot report to themselves.'})
+
+        manager_id = self.manager_id
+        visited_manager_ids = set()
+        while manager_id:
+            if manager_id == self.supervisor_id:
+                raise ValidationError({'manager': 'This reporting line would create a cycle.'})
+            if manager_id in visited_manager_ids:
+                raise ValidationError({'manager': 'The existing reporting lines contain a cycle.'})
+            visited_manager_ids.add(manager_id)
+            next_line = SupervisorReporting.objects.filter(
+                supervisor_id=manager_id,
+            ).exclude(pk=self.pk).values_list('manager_id', flat=True).first()
+            manager_id = next_line
+
+    def __str__(self):
+        return f"{self.supervisor} reports to {self.manager}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+
+def get_assigned_supervisor(profile):
+    if profile.role == 'Supervisor':
+        reporting_line = SupervisorReporting.objects.filter(
+            supervisor=profile,
+        ).select_related('manager__user').first()
+        return reporting_line.manager if reporting_line else None
+    if profile.role == 'Employee' and profile.department_id:
+        assignment = DepartmentSupervisor.objects.filter(
+            department_id=profile.department_id,
+        ).select_related('supervisor__user').first()
+        if not assignment:
+            return None
+        if assignment.supervisor_id == profile.id:
+            hod_assignment = AssignDepartmentHod.objects.filter(
+                department_id=profile.department_id,
+            ).select_related('hod__user').first()
+            return hod_assignment.hod if hod_assignment else None
+        return assignment.supervisor
+    return None
 
 
 class AssignDepartmentHod(models.Model):
@@ -140,10 +256,14 @@ class Competency(models.Model):
     
     name = models.CharField(max_length=255)
     competency_type = models.CharField(max_length=10, choices=TYPE_CHOICES)
+    display_order = models.PositiveIntegerField(default=0, db_index=True)
     description = models.TextField(
         blank=True,
         help_text='Enter each description item on a separate line.',
     )
+
+    class Meta:
+        ordering = ['competency_type', 'display_order', 'name']
 
     def __str__(self):
         return f"[{self.get_competency_type_display()}] {self.name}"
@@ -273,7 +393,11 @@ class Appraisal(models.Model):
         groups = []
         for competency_score in self.competency_scores.select_related(
             'competency',
-        ).prefetch_related('statement_scores'):
+        ).prefetch_related('statement_scores').order_by(
+            'competency__competency_type',
+            'competency__display_order',
+            'competency__name',
+        ):
             weight = (
                 Decimal('0.3')
                 if competency_score.competency.competency_type == 'core'
@@ -491,23 +615,23 @@ class AppraisalTarget(models.Model):
 
 class AppraisalCompetencyScore(models.Model):
     MID_YEAR_PROGRESS_CHOICES = [
-        ('demonstrated', 'Competency demonstrated'),
-        ('not_demonstrated', 'Competency not demonstrated'),
+        ('fairly_exhibited', 'Fairly exhibited'),
+        ('poorly_exhibited', 'Poorly exhibited'),
+        ('well_exhibited', 'Well exhibited'),
+        ('excellently_exhibited', 'Excellently exhibited'),
+        ('exceptionally_exhibited', 'Exceptionally exhibited'),
     ]
     MID_YEAR_REMARK_CHOICES = [
-        ('exceptional', 'Exceptional'),
-        ('exceeds', 'Exceeds expectations'),
-        ('meets', 'Meets expectations'),
-        ('below', 'Below expectation'),
-        ('unacceptable', 'Unacceptable'),
+        ('maintain_competency', 'Maintain competency'),
+        ('change_competency', 'Change competency'),
     ]
 
     appraisal = models.ForeignKey(Appraisal, on_delete=models.CASCADE, related_name="competency_scores")
     competency = models.ForeignKey(Competency, on_delete=models.PROTECT)
 
     # Section 3: Supervisor fills in July
-    mid_year_progress = models.CharField(max_length=20, choices=MID_YEAR_PROGRESS_CHOICES, null=True, blank=True)
-    mid_year_remark = models.CharField(max_length=20, choices=MID_YEAR_REMARK_CHOICES, null=True, blank=True)
+    mid_year_progress = models.CharField(max_length=30, choices=MID_YEAR_PROGRESS_CHOICES, null=True, blank=True)
+    mid_year_remark = models.CharField(max_length=30, choices=MID_YEAR_REMARK_CHOICES, null=True, blank=True)
 
     # Section 5: Supervisor fills in December (1 to 5 Radio Buttons)
     end_year_score = models.IntegerField(
@@ -567,8 +691,3 @@ def manage_user_groups(sender, instance, **kwargs):
     instance.user.groups.clear()
     group = Group.objects.get(name=instance.role)
     instance.user.groups.add(group)
-
-
-class StaffID(models.Model): 
-    Staff_ID = models.CharField(max_length=20, unique=True)  
-    

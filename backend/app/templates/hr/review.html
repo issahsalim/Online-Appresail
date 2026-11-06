@@ -62,8 +62,10 @@
             padding: .6rem .95rem;
         }
         .hr-review-page .btn-success { background: #26845b; border-color: #26845b; }
-        .hr-review-page .return-review-form { border-color: #e4c982 !important; }
-        .hr-review-page .return-review-form > .card-header { background: #fbf5e7; border-left: 4px solid #d49b18; }
+        .hr-review-page .return-review-form { border-color: #a43a10 !important; }
+        .hr-review-page .return-review-form > .card-header { background: #a43a10; border-left: 0; color: #fff; }
+        .hr-review-page .return-review-form .btn-primary { background: #a43a10; border-color: #a43a10; }
+        .hr-review-page .return-review-form .btn-primary:hover { background: #852e0b; border-color: #852e0b; }
         @media (max-width: 575.98px) {
             .hr-review-page .card-body { padding: .9rem; }
             .hr-review-page button { width: 100%; }
@@ -74,12 +76,16 @@
         <h1>Final approval for {{ appraisal.employee.user.username }}</h1>
         <p>Review the appraisal scores and HOD comments before locking the final result.</p>
     </header>
+
     {% include 'appraisal/_employee_details.html' %}
-    {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
     {% include 'appraisal/_training.html' %}
+    {% if not is_hod_appraisal %}
+        {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
+    {% endif %}
+    {% include 'appraisal/_guidance_notes.html' %}
 
     {% if return_history %}
-        <div class="card mb-4 border-warning">
+        <div class="card mb-4  ">
             <div class="card-header bg-warning">Return history and required corrections</div>
             <div class="card-body">
                 {% for decision in return_history %}
@@ -93,15 +99,116 @@
         </div>
     {% endif %}
 
-    {% include 'appraisal/_targets_readonly.html' %}
-    {% include 'appraisal/_competencies_readonly.html' %}
+    {% if is_hod_appraisal %}
+        <form method="POST" class="mb-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="save_hod_scores">
+            {% if target_formset.errors or target_formset.non_form_errors or statement_score_formset.errors or statement_score_formset.non_form_errors %}
+                <div class="alert alert-danger" role="alert">
+                    <strong>Scores were not saved.</strong> Correct the highlighted fields and try again.
+                </div>
+            {% endif %}
+            <section class="appraisal-paper mb-4" aria-labelledby="hod-target-scoring-heading">
+                <h2 class="appraisal-section-title" id="hod-target-scoring-heading">SECTION 2: HR Assessment of HOD Targets</h2>
+                <div class="appraisal-section-body">
+                    <p class="appraisal-help">Review each target and complete its end-year assessment and score. Mid-year and supervisor-only fields are not included.</p>
+                    {{ target_formset.management_form }}
+                    {{ target_formset.non_form_errors }}
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle">
+                            <thead>
+                                <tr>
+                                    <th>No.</th><th>Key result area</th><th>Target</th>
+                                    <th>Assessment</th><th>Weight</th><th>Score (1-5)</th><th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for target_form in target_formset %}
+                                    <tr>
+                                        <td>
+                                            {% for hidden in target_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                            {{ forloop.counter }}{{ target_form.non_field_errors }}
+                                        </td>
+                                        <td>{{ target_form.instance.key_result_area }}</td>
+                                        <td>{{ target_form.instance.target_description }}</td>
+                                        <td>{{ target_form.end_year_assessment }}{{ target_form.end_year_assessment.errors }}</td>
+                                        <td>{{ target_form.instance.end_year_weight }}</td>
+                                        <td>{{ target_form.end_year_score }}{{ target_form.end_year_score.errors }}</td>
+                                        <td>{{ target_form.end_year_comment }}{{ target_form.end_year_comment.errors }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="7" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section class="appraisal-paper mb-4" aria-labelledby="hod-competency-scoring-heading">
+                <h2 class="appraisal-section-title" id="hod-competency-scoring-heading">SECTION 3: HR Assessment of HOD Competencies</h2>
+                <div class="appraisal-section-body">
+                    <p class="appraisal-help">Score each selected competency statement from 1 to 5.</p>
+                    {{ statement_score_formset.management_form }}
+                    {{ statement_score_formset.non_form_errors }}
+                    {% for group in competency_groups %}
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <strong>{{ group.score.competency.name }}</strong>
+                                <span class="text-muted">({{ group.score.competency.get_competency_type_display }})</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0">
+                                    <thead><tr><th>Selected competency statement</th><th>Score (1-5)</th></tr></thead>
+                                    <tbody>
+                                        {% for statement_form in group.statements %}
+                                            <tr>
+                                                <td>
+                                                    {% for hidden in statement_form.hidden_fields %}{{ hidden }}{% endfor %}
+                                                    {{ statement_form.instance.statement }}
+                                                    {{ statement_form.end_year_score.errors }}
+                                                </td>
+                                                <td>{{ statement_form.end_year_score }}</td>
+                                            </tr>
+                                        {% empty %}
+                                            <tr><td colspan="2">No competency statements were selected.</td></tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p>No competencies have been selected for this appraisal.</p>
+                    {% endfor %}
+                </div>
+            </section>
+            <button type="submit" class="btn btn-primary">Save HOD Scores</button>
+        </form>
+    {% else %}
+        {% include 'appraisal/_targets_readonly.html' %}
+        {% include 'appraisal/_midyear_endyear_readonly.html' %}
+        {% include 'appraisal/_competencies_readonly.html' %}
+    {% endif %}
     {% include 'appraisal/_annual_appraisal_results.html' %}
-    {% include 'appraisal/_appraisal_comment_sections.html' %}
-    {% include 'appraisal/_hod_comment_section.html' %}
+    {% if is_hod_appraisal %}
+        <section class="appraisal-paper" aria-labelledby="hod-self-comments-heading">
+            <h2 class="appraisal-section-title" id="hod-self-comments-heading">Appraisee’s Comments on Overall Assessment</h2>
+            <div class="appraisal-section-body">
+                <div class="appraisal-comment-box">{{ appraisal.employee_comments|default:"No appraisee comments provided."|linebreaksbr }}</div>
+                <div class="appraisal-signature-row">
+                    <span><strong>HOD’s signature:</strong> {{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}</span>
+                    <span><strong>Date:</strong> {{ appraisal.employee_signed_at|date:"d/m/Y"|default:"—" }}</span>
+                </div>
+            </div>
+        </section>
+    {% else %}
+        {% include 'appraisal/_appraisal_comment_sections.html' %}
+        {% include 'appraisal/_hod_comment_section.html' %}
+    {% endif %}
 
     <!-- HR COMMENTS FORM -->
     <section class="appraisal-paper mb-4 border-success">
-        <h2 class="appraisal-section-title">Final HR Approval</h2>
+        <h2 class="appraisal-section-title">{% if is_hod_appraisal %}HR Final Comments and Approval{% else %}Final HR Approval{% endif %}</h2>
         <form method="POST" class="appraisal-section-body">
             {% csrf_token %}
             <div class="mb-3">
@@ -124,14 +231,14 @@
         </form>
     </section>
 
-    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 border-warning return-review-form">
+    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mb-4 return-review-form">
         {% csrf_token %}
-        <div class="card-header bg-warning">Return to HOD for Review</div>
+        <div class="card-header">Return to HOD for Review</div>
         <div class="card-body">
             {{ return_form.comment.label_tag }}
             {{ return_form.comment }}
             {{ return_form.comment.errors }}
-            <button type="submit" class="btn btn-warning mt-3">Return to HOD</button>
+            <button type="submit" class="btn btn-primary mt-3">Return to HOD</button>
         </div>
     </form>
 </div>

@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% block content %}
+<main class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h1 class="h3 mb-1">Audit log</h1>
+            <p class="text-muted mb-0">
+                Read-only record of account and application changes.
+                {% if is_superadmin %}Superadmin activity is visible to you.{% else %}Superadmin activity is hidden.{% endif %}
+            </p>
+        </div>
+        {% if is_superadmin %}
+            <a class="btn btn-outline-secondary" href="{% url 'admin:index' %}">Back to admin</a>
+        {% else %}
+            <a class="btn btn-outline-secondary" href="{% url 'hr_dashboard' %}">Back to dashboard</a>
+        {% endif %}
+    </div>
+
+    <form method="get" class="row g-2 align-items-end mb-3">
+        <div class="col-md-6">
+            <label class="form-label" for="audit-search">Search</label>
+            <input id="audit-search" class="form-control" type="search" name="q" value="{{ search }}"
+                   placeholder="Actor, action, model, or record">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="audit-action">Action</label>
+            <select id="audit-action" class="form-select" name="action">
+                <option value="">All actions</option>
+                {% for value, label in action_choices %}
+                    <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary" href="{% url 'audit_log' %}">Clear</a>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Date and time</th>
+                    <th scope="col">Actor</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Affected record</th>
+                    <th scope="col">IP address</th>
+                    <th scope="col">Audit note</th>
+                    <th scope="col">Change summary</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in audit_page %}
+                    <tr>
+                        <td>{{ entry.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ entry.actor_username|default:"System" }}</td>
+                        <td>{% if entry.actor_is_superuser %}Superadmin{% else %}{{ entry.actor_role|default:"—" }}{% endif %}</td>
+                        <td>{{ entry.get_action_display }}</td>
+                        <td>{{ entry.object_label|default:entry.model_name }}</td>
+                        <td>{{ entry.ip_address|default:"—" }}</td>
+                        <td>{{ entry.note|default:"—" }}</td>
+                        <td>
+                            {% if entry.changes.record %}
+                                {{ entry.changes.record|capfirst }}
+                            {% else %}
+                                {% for field, values in entry.changes.items %}
+                                    {{ field }} changed{% if not forloop.last %}; {% endif %}
+                                {% empty %}
+                                    —
+                                {% endfor %}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="text-center text-muted py-4">No audit records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if audit_page.has_other_pages %}
+        <nav aria-label="Audit log pages">
+            <ul class="pagination justify-content-center">
+                {% if audit_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?q={{ search|urlencode }}&action={{ selected_action|urlencode }}&page={{ audit_page.previous_page_number }}">Previous</a></li>
+                {% endif %}
+                <li class="page-item disabled"><span class="page-link">Page {{ audit_page.number }} of {{ audit_page.paginator.num_pages }}</span></li>
+                {% if audit_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="?q={{ search|urlencode }}&action={{ selected_action|urlencode }}&page={{ audit_page.next_page_number }}">Next</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</main>
+{% endblock %}

@@ -280,15 +280,21 @@
     </style>
 
     <aside class="role-dashboard-sidebar" aria-label="Supervisor dashboard navigation" data-default-section="assigned">
+        <button class="role-sidebar-toggle" type="button" aria-controls="supervisor-dashboard-navigation" aria-expanded="false" aria-label="Open menu">
+            <span aria-hidden="true">☰</span>
+        </button>
         <div class="role-sidebar-brand">
             <span class="role-sidebar-mark" aria-hidden="true">✚</span>
             <span>Staff Appraisal<br><small class="fw-normal opacity-75">SUPERVISOR WORKSPACE</small></span>
-            <button class="role-sidebar-toggle" type="button" aria-controls="supervisor-dashboard-navigation" aria-expanded="false">
-                <span aria-hidden="true">☰</span> Menu
-            </button>
         </div>
         <div class="role-sidebar-label">Workspace</div>
+        <button class="role-sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
         <nav class="role-sidebar-nav" id="supervisor-dashboard-navigation">
+            <div class="role-sidebar-drawer-brand">
+                <span class="role-sidebar-mark" aria-hidden="true">✚</span>
+                <span class="role-sidebar-drawer-copy">Mathias Catholic Hospital<small>SUPERVISOR WORKSPACE</small></span>
+                <button class="role-sidebar-close" type="button" aria-label="Close menu" data-sidebar-close>×</button>
+            </div>
             <button class="role-sidebar-link active" type="button" data-role-section-target="assigned">
                 <span class="role-sidebar-icon" aria-hidden="true">◉</span>
                 <span class="role-sidebar-link-copy">
@@ -524,32 +530,44 @@
     {% if has_supervisor %}
                 <section class="supervisor-workspace role-dashboard-section" data-role-section="own" aria-label="My own appraisal" hidden>
                     <div class="supervisor-tab-content">
-                        <section class="supervisor-own-card">
-                            <div class="supervisor-own-top">
-                                <div>
-                                    <h2>My Own Appraisal</h2>
-                                    <p>As an employee, you can also set your goals and submit them to your assigned supervisor.</p>
+                        <div class="supervisor-section-heading">
+                            <div>
+                                <h2>My Own Appraisals</h2>
+                                <p>Access your appraisal for each cycle. Draft and returned forms can be edited.</p>
+                            </div>
+                        </div>
+                        {% for appraisal in my_appraisals %}
+                            <section class="supervisor-own-card mb-3">
+                                <div class="supervisor-own-top">
+                                    <div>
+                                        <h2>Cycle {{ appraisal.cycle.year }}{% if appraisal.cycle.is_active %} · Active{% endif %}</h2>
+                                        <p>As a supervisor, you can submit your own appraisal to your assigned HOD.</p>
+                                    </div>
+                                    <span class="supervisor-status">{{ appraisal.get_status_display }}</span>
                                 </div>
-                                <span class="supervisor-status">{{ my_appraisal.get_status_display }}</span>
-                            </div>
-                            <div class="supervisor-own-actions">
-                                <a href="{% url 'fill_targets' %}" class="supervisor-action-secondary">
-                                    {% if my_appraisal.status == 'draft' %}Edit my goals{% else %}View my goals{% endif %}
-                                </a>
-                                {% if my_appraisal.status == 'draft' %}
-                                    <form method="post" action="{% url 'submit_to_supervisor' my_appraisal.id %}">
-                                        {% csrf_token %}
-                                        <button
-                                            type="submit"
-                                            class="supervisor-action"
-                                            data-confirm="Submit your appraisal to your supervisor? You will not be able to edit it afterward."
-                                            data-confirm-title="Submit appraisal?"
-                                            data-confirm-label="Submit appraisal"
-                                        >Submit to my supervisor</button>
-                                    </form>
-                                {% endif %}
-                            </div>
-                        </section>
+                                <div class="supervisor-own-actions">
+                                    {% if appraisal.status == 'draft' or appraisal.status == 'returned_employee' %}
+                                        <a href="{% url 'fill_targets_year' appraisal.cycle.year %}" class="supervisor-action-secondary">
+                                            {% if appraisal.status == 'returned_employee' %}Review and resubmit{% else %}Edit my goals{% endif %}
+                                        </a>
+                                        <form method="post" action="{% url 'submit_to_supervisor' appraisal.id %}">
+                                            {% csrf_token %}
+                                            <button
+                                                type="submit"
+                                                class="supervisor-action"
+                                                data-confirm="Submit your appraisal to your assigned HOD? You will not be able to edit it afterward."
+                                                data-confirm-title="Submit appraisal?"
+                                                data-confirm-label="Submit to HOD"
+                                            >Submit to my HOD</button>
+                                        </form>
+                                    {% else %}
+                                        <a href="{% url 'employee_appraisal_detail' appraisal.id %}" class="supervisor-action-secondary">View appraisal</a>
+                                    {% endif %}
+                                </div>
+                            </section>
+                        {% empty %}
+                            <p class="text-muted">No appraisal cycles are available.</p>
+                        {% endfor %}
                     </div>
                 </section>
     {% endif %}

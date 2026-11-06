@@ -1,9 +1,9 @@
 <section class="appraisal-paper" aria-labelledby="appraisee-personal-information-heading">
     <h2 class="appraisal-section-title" id="appraisee-personal-information-heading">SECTION 1 - A: Appraisee’s Personal Information</h2>
     <div class="appraisal-period">
-        <strong>Period of report:</strong>
-        <span>From {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"Not set" }}</span>
-        <span>To {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"Not set" }}</span>
+        <strong style="text-transform: uppercase;">Period of report:</strong>
+        <span style="font-weight: 700;">From {{ appraisal.cycle.report_period_from|date:"d/m/Y"|default:"Not set" }}</span>
+        <span style="font-weight: 700;">To {{ appraisal.cycle.report_period_to|date:"d/m/Y"|default:"Not set" }}</span>
     </div>
     <div class="appraisal-section-body">
         <div class="appraisal-fields">

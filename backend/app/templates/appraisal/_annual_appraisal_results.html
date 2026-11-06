@@ -6,10 +6,9 @@
     <div class="appraisal-section-body">
         <h3 class="appraisal-subsection-title">Overall Assessment</h3>
         <div class="appraisal-results-lines">
-            <p><strong>Performance Assessment (M)</strong><span>=</span><span>{{ score_breakdown.target_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-            <p><strong>Core Competencies Assessment (N)</strong><span>=</span><span>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-            <p><strong>Non-Core Competencies Assessment (O)</strong><span>=</span><span>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
-            <p><strong>Overall Total</strong><span>=</span><span>{{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>N — Average of core competency group averages:</strong><span>=</span><span>{{ score_breakdown.core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>O — Average of non-core competency group averages:</strong><span>=</span><span>{{ score_breakdown.non_core_component|floatformat:2|default_if_none:"Pending" }}</span></p>
+            <p><strong>T — M + N + O:</strong><span>=</span><span>{{ score_breakdown.total|floatformat:2|default_if_none:"Pending" }}</span></p>
         </div>
         <p class="appraisal-final-rating"><strong>Overall Performance Rating</strong><span>=</span>
             {% if score_breakdown.total is not None %}

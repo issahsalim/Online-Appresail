@@ -119,6 +119,52 @@
         .supervisor-review-page .target-review-table textarea,
         .supervisor-review-page .target-review-table select,
         .supervisor-review-page .target-review-table input { min-width: 120px; }
+        .supervisor-review-page .target-review-table textarea,
+        .supervisor-review-page textarea {
+            box-sizing: border-box;
+            max-width: 100%;
+            width: 100%;
+        }
+        .supervisor-review-page .score-radio-options {
+            align-items: center;
+            display: flex;
+            flex-wrap: nowrap;
+            gap: .55rem;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .supervisor-review-page .score-radio-options li { margin: 0; }
+        .supervisor-review-page .score-radio-options label {
+            align-items: center;
+            display: inline-flex;
+            gap: .2rem;
+            margin: 0;
+        }
+        .supervisor-review-page .score-radio-options input[type="radio"] {
+            margin: 0;
+            min-height: 0;
+            padding: 0;
+        }
+        .supervisor-review-page .competency-group .card-body { padding: .65rem; }
+        .supervisor-review-page .competency-group .table {
+            table-layout: fixed;
+            width: 100%;
+        }
+        .supervisor-review-page .competency-group .table th:first-child,
+        .supervisor-review-page .competency-group .table td:first-child {
+            overflow-wrap: anywhere;
+            width: 40%;
+        }
+        .supervisor-review-page .competency-group .table th:nth-child(2),
+        .supervisor-review-page .competency-group .table td:nth-child(2) { width: 10%; }
+        .supervisor-review-page .competency-group .table th:nth-child(3),
+        .supervisor-review-page .competency-group .table td:nth-child(3) { width: 40%; }
+        .supervisor-review-page .competency-group .table th:nth-child(4),
+        .supervisor-review-page .competency-group .table td:nth-child(4) { width: 10%; }
+        .supervisor-review-page .competency-group .table > :not(caption) > * > * {
+            padding: .45rem;
+        }
         .supervisor-review-page .results-section-title {
             align-items: center;
             display: flex;
@@ -228,8 +274,8 @@
         .supervisor-review-page .btn-primary { background: #a43a10; border-color: #a43a10; }
         .supervisor-review-page .btn-primary:hover { background: #852e0b; border-color: #852e0b; }
         .supervisor-review-page .btn-success { background: #26845b; border-color: #26845b; }
-        .supervisor-review-page .return-review-form { border-color: #e4c982 !important; }
-        .supervisor-review-page .return-review-form > .card-header { background: #fbf5e7; border-left: 4px solid #d49b18; }
+        .supervisor-review-page .return-review-form { border-color: #a43a10 !important; }
+        .supervisor-review-page .return-review-form > .card-header { background: #a43a10; border-left: 0; color: #fff; }
         @media (max-width: 575.98px) {
             .supervisor-review-page .card-body { padding: .9rem; }
             .supervisor-review-page .appraisal-fields { grid-template-columns: 1fr; }
@@ -240,12 +286,19 @@
             .supervisor-review-page .assessment-rating-row strong { grid-column: 1; }
             .supervisor-review-page .rating-option { grid-template-columns: 20px minmax(150px, .8fr) 1fr; }
             .supervisor-review-page .rating-scale-table { min-width: 620px; }
+            .supervisor-review-page .score-radio-options { gap: .25rem; }
+            .supervisor-review-page .score-radio-options label { gap: .1rem; }
+            .supervisor-review-page .score-radio-options input[type="radio"] {
+                height: 15px;
+                width: 15px;
+            }
             .supervisor-review-page form > .btn,
             .supervisor-review-page form button { width: 100%; }
         }
     </style>
+
     <header class="review-hero">
-        <span class="review-kicker">Supervisor review · {{ appraisal.cycle.year }}</span>
+        <span class="review-kicker">{% if is_hod_review %}HOD review{% else %}Supervisor review{% endif %} · {{ appraisal.cycle.year }}</span>
         <h1>Reviewing appraisal for {{ appraisal.employee.user.username }}</h1>
         <p>Assess targets and selected competency statements, then save your scores or send the appraisal forward.</p>
     </header>
@@ -290,24 +343,8 @@
             </div>
         </section>
 
-        <section class="appraisal-paper" aria-labelledby="appraiser-information-heading">
-            <h2 class="appraisal-section-title" id="appraiser-information-heading">SECTION 1 - B: Appraiser’s Information</h2>
-            <div class="appraisal-section-body">
-                {% if appraisal.supervisor %}
-                    <div class="appraisal-fields">
-                        <div class="appraisal-field"><strong>Name:</strong> {% if appraisal.supervisor.title %}{{ appraisal.supervisor.get_title_display }} {% endif %}{{ appraisal.supervisor.user.get_full_name|default:appraisal.supervisor.user.username }}{% if appraisal.supervisor.other_names %} {{ appraisal.supervisor.other_names }}{% endif %}</div>
-                        <div class="appraisal-field"><strong>Staff ID:</strong> {{ appraisal.supervisor.user.username }}</div>
-                        <div class="appraisal-field"><strong>Job title:</strong> {{ appraisal.supervisor.job_title|default:"—" }}</div>
-                        <div class="appraisal-field"><strong>Email:</strong> {{ appraisal.supervisor.user.email|default:"—" }}</div>
-                    </div>
-                {% else %}
-                    <p class="mb-0">A supervisor has not been assigned yet.</p>
-                {% endif %}
-            </div>
-        </section>
-
         <section class="appraisal-paper" aria-labelledby="training-heading">
-            <h2 class="appraisal-section-title" id="training-heading">Training Received During the Year Under Review</h2>
+            <h2 class="appraisal-section-title" id="training-heading">TRAINING RECEIVED DURING THE YEAR UNDER REVIEW</h2>
             <div class="appraisal-section-body">
                 <p class="appraisal-help">Training information submitted by the employee is read-only.</p>
                 <div class="table-responsive">
@@ -328,6 +365,8 @@
                 </div>
             </div>
         </section>
+        {% include 'appraisal/_supervisor_details.html' with supervisor=appraisal.supervisor %}
+        {% include 'appraisal/_guidance_notes.html' %}
 
         {% if target_formset.errors or target_formset.non_form_errors or comp_formset.errors or comp_formset.non_form_errors or statement_score_formset.errors or statement_score_formset.non_form_errors %}
             <div class="alert alert-danger" role="alert">
@@ -368,30 +407,19 @@
         {% endif %}
         
         <section class="appraisal-paper" id="targets-section" aria-labelledby="targets-heading">
-            <h2 class="appraisal-section-title" id="targets-heading">SECTION 2: Performance Planning Form and Supervisor Review</h2>
+            <h2 class="appraisal-section-title" id="targets-heading">SECTION 2: Performance Planning Form</h2>
             <div class="appraisal-section-body">
-                <p class="appraisal-help">Employee-entered performance plan details are read-only. Complete the mid-year and end-year review fields in the corresponding target row.</p>
+                <p class="appraisal-help">Performance targets agreed between the appraiser and employee.</p>
                 {{ target_formset.management_form }}
                 {{ target_formset.non_form_errors }}
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle target-review-table">
                         <thead>
                             <tr>
-                                <th class="review-group-heading" colspan="4">Employee Performance Plan (read-only)</th>
-                                <th class="review-group-heading" colspan="2">Mid-Year Review</th>
-                                <th class="review-group-heading" colspan="4">End-Year Review</th>
-                            </tr>
-                            <tr>
                                 <th class="appraisal-table-number">No.</th>
                                 <th>Key result areas<br><span class="fw-normal">(Not more than 5)</span></th>
                                 <th>Targets<br><span class="fw-normal">(Specific, measurable, realistic and time-framed)</span></th>
                                 <th>Resources required</th>
-                                <th>Progress</th>
-                                <th>Remark</th>
-                                <th>Assessment</th>
-                                <th>Weight</th>
-                                <th>Score (1-5)</th>
-                                <th>Comment</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -405,15 +433,9 @@
                                     <td class="employee-entry">{{ form.instance.key_result_area|default:"—" }}</td>
                                     <td class="employee-entry">{{ form.instance.target_description|default:"—" }}</td>
                                     <td class="employee-entry">{{ form.instance.resources_required|default:"—" }}</td>
-                                    <td>{{ form.mid_year_progress }}{{ form.mid_year_progress.errors }}</td>
-                                    <td>{{ form.mid_year_remark }}{{ form.mid_year_remark.errors }}</td>
-                                    <td>{{ form.end_year_assessment }}{{ form.end_year_assessment.errors }}</td>
-                                    <td>{{ form.end_year_weight }}{{ form.end_year_weight.errors }}</td>
-                                    <td>{{ form.end_year_score }}{{ form.end_year_score.errors }}</td>
-                                    <td>{{ form.end_year_comment }}{{ form.end_year_comment.errors }}</td>
                                 </tr>
                             {% empty %}
-                                <tr><td colspan="10" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                                <tr><td colspan="4" class="text-center">No targets have been added to this appraisal yet.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -421,19 +443,33 @@
             </div>
         </section>
 
-        <section class="appraisal-paper" aria-labelledby="competency-review-heading">
-            <h2 class="appraisal-section-title" id="competency-review-heading">SECTION 3: Competencies Assessment</h2>
+        <section class="appraisal-paper" aria-labelledby="mid-year-review-heading">
+            <h2 class="appraisal-section-title" id="mid-year-review-heading">SECTION 3: Mid-Year Review Form</h2>
             <div class="appraisal-section-body">
-                <p class="appraisal-help">Employee-selected competency statements are shown as submitted. Complete the mid-year assessment and score each selected statement.</p>
+                <p class="appraisal-help">Review progress against each target and record the agreed remarks.</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-bordered align-middle target-review-table">
+                        <thead><tr><th class="appraisal-table-number">No.</th><th>Target</th><th>Progress review</th><th>Remarks</th></tr></thead>
+                        <tbody>
+                            {% for form in target_formset %}
+                                <tr>
+                                    <td class="appraisal-table-number">{{ forloop.counter }}</td>
+                                    <td class="employee-entry">{{ form.instance.target_description|default:"—" }}</td>
+                                    <td>{{ form.mid_year_progress }}{{ form.mid_year_progress.errors }}</td>
+                                    <td>{{ form.mid_year_remark }}{{ form.mid_year_remark.errors }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <h3 class="overall-assessment-label">Competency progress review</h3>
                 {{ comp_formset.management_form }}
                 {{ comp_formset.non_form_errors }}
-                {{ statement_score_formset.management_form }}
                 {% for group in competency_groups %}
                     <div
-                        class="card mb-4 border-0 shadow-sm competency-group"
-                        data-competency-group
-                        data-type="{{ group.type }}"
-                        data-weight="{{ group.weight }}"
+                        class="card mb-4 border-0 shadow-sm"
                     >
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <strong>{{ group.form.instance.competency.name }}</strong>
@@ -453,46 +489,123 @@
                                     </div>
                                 {% endfor %}
                             </div>
-                            <div class="table-responsive">
-                                <table class="table table-bordered align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>Selected statement</th>
-                                            <th>Weight</th>
-                                            <th>Grade (1-5)</th>
-                                            <th>W × G</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for statement_form in group.statements %}
-                                            <tr data-statement-row data-weight="{{ group.weight }}">
-                                                <td>
-                                                    {% for hidden in statement_form.hidden_fields %}{{ hidden }}{% endfor %}
-                                                    {{ statement_form.instance.statement }}
-                                                    {{ statement_form.end_year_score.errors }}
-                                                </td>
-                                                <td>{{ group.weight }}</td>
-                                                <td>{{ statement_form.end_year_score }}</td>
-                                                <td><span data-weighted-score>—</span></td>
-                                            </tr>
-                                        {% empty %}
-                                            <tr><td colspan="4" class="text-muted">No statements were selected.</td></tr>
-                                        {% endfor %}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th colspan="3">Group total</th>
-                                            <td data-group-total>—</td>
-                                        </tr>
-                                        <tr>
-                                            <th colspan="3">Group average (total ÷ selected statements)</th>
-                                            <td data-group-average>—</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
                         </div>
                     </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="appraisal-paper" aria-labelledby="end-year-review-heading">
+            <h2 class="appraisal-section-title" id="end-year-review-heading">SECTION 4: End-of-Year Review Form</h2>
+            <div class="appraisal-section-body">
+                <p class="appraisal-help">Complete the performance assessment, target weight, score and comments for each target.</p>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle target-review-table">
+                        <thead>
+                            <tr><th class="appraisal-table-number">No.</th><th>Target</th><th>Performance assessment</th><th>Weight of target</th><th>Score / rating</th><th>Comments</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for form in target_formset %}
+                                <tr>
+                                    <td class="appraisal-table-number">{{ forloop.counter }}</td>
+                                    <td class="employee-entry">{{ form.instance.target_description|default:"—" }}</td>
+                                    <td>{{ form.end_year_assessment }}{{ form.end_year_assessment.errors }}</td>
+                                    <td>{{ form.instance.end_year_weight }}</td>
+                                    <td>{{ form.end_year_score }}{{ form.end_year_score.errors }}</td>
+                                    <td>{{ form.end_year_comment }}{{ form.end_year_comment.errors }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="6" class="text-center">No targets have been added to this appraisal yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        {{ statement_score_formset.management_form }}
+        <section class="appraisal-paper" aria-labelledby="core-competencies-heading">
+            <h2 class="appraisal-section-title" id="core-competencies-heading">SECTION 5: Annual Appraisal — Core Competencies</h2>
+            <div class="appraisal-section-body">
+                {% for group in competency_groups %}
+                    {% if group.type == 'core' %}
+                        <div
+                            class="card mb-4 border-0 shadow-sm competency-group"
+                            data-competency-group
+                            data-type="{{ group.type }}"
+                            data-weight="{{ group.weight }}"
+                        >
+                            <div class="card-header"><strong>{{ group.form.instance.competency.name }}</strong></div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle mb-0">
+                                        <thead><tr><th>Selected statement</th><th>Weight (W)</th><th>Grade (G)</th><th>W × G</th></tr></thead>
+                                        <tbody>
+                                            {% for statement_form in group.statements %}
+                                                <tr data-statement-row data-weight="{{ group.weight }}">
+                                                    <td>{% for hidden in statement_form.hidden_fields %}{{ hidden }}{% endfor %}{{ statement_form.instance.statement }}{{ statement_form.end_year_score.errors }}</td>
+                                                    <td>{{ group.weight }}</td>
+                                                    <td class="score-radio-cell">{{ statement_form.end_year_score }}</td>
+                                                    <td><span data-weighted-score>—</span></td>
+                                                </tr>
+                                            {% empty %}
+                                                <tr><td colspan="4" class="text-muted">No statements were selected.</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr><th colspan="3">Group total</th><td data-group-total>—</td></tr>
+                                            <tr><th colspan="3">Group average</th><td data-group-average>—</td></tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% empty %}
+                    <p>No core competencies have been selected for this appraisal.</p>
+                {% endfor %}
+            </div>
+        </section>
+        <section class="appraisal-paper" aria-labelledby="non-core-competencies-heading">
+            <h2 class="appraisal-section-title" id="non-core-competencies-heading">SECTION 5: Annual Appraisal (Continuation) — Non-Core Competencies</h2>
+            <div class="appraisal-section-body">
+                {% for group in competency_groups %}
+                    {% if group.type == 'non_core' %}
+                        <div
+                            class="card mb-4 border-0 shadow-sm competency-group"
+                            data-competency-group
+                            data-type="{{ group.type }}"
+                            data-weight="{{ group.weight }}"
+                        >
+                            <div class="card-header"><strong>{{ group.form.instance.competency.name }}</strong></div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle mb-0">
+                                        <thead><tr><th>Selected statement</th><th>Weight (W)</th><th>Grade (G)</th><th>W × G</th></tr></thead>
+                                        <tbody>
+                                            {% for statement_form in group.statements %}
+                                                <tr data-statement-row data-weight="{{ group.weight }}">
+                                                    <td>{% for hidden in statement_form.hidden_fields %}{{ hidden }}{% endfor %}{{ statement_form.instance.statement }}{{ statement_form.end_year_score.errors }}</td>
+                                                    <td>{{ group.weight }}</td>
+                                                    <td class="score-radio-cell">{{ statement_form.end_year_score }}</td>
+                                                    <td><span data-weighted-score>—</span></td>
+                                                </tr>
+                                            {% empty %}
+                                                <tr><td colspan="4" class="text-muted">No statements were selected.</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr><th colspan="3">Group total</th><td data-group-total>—</td></tr>
+                                            <tr><th colspan="3">Group average</th><td data-group-average>—</td></tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% empty %}
+                    <p>No non-core competencies have been selected for this appraisal.</p>
                 {% endfor %}
             </div>
         </section>
@@ -503,22 +616,22 @@
                 <span>(Continuation)</span>
             </h2>
             <div class="appraisal-section-body">
-                <h3 class="overall-assessment-label">Overall Assessment</h3>
+                <h3 class="overall-assessment-label">Live Overall Assessment</h3>
                 <div class="assessment-results">
                     <div class="assessment-result-row">
-                        <strong>Performance Assessment (M)</strong><span>=</span>
+                        <strong>M — A × 0.6:</strong><span>=</span>
                         <span class="assessment-result-value" data-total="M">Pending</span>
                     </div>
                     <div class="assessment-result-row">
-                        <strong>Core Competencies Assessment (N)</strong><span>=</span>
+                        <strong>N — Average of core competency group averages:</strong><span>=</span>
                         <span class="assessment-result-value" data-total="N">Pending</span>
                     </div>
                     <div class="assessment-result-row">
-                        <strong>Non-Core Competencies Assessment (O)</strong><span>=</span>
+                        <strong>O — Average of non-core competency group averages:</strong><span>=</span>
                         <span class="assessment-result-value" data-total="O">Pending</span>
                     </div>
                     <div class="assessment-result-row">
-                        <strong>Overall Total</strong><span>=</span>
+                        <strong>T — M + N + O:</strong><span>=</span>
                         <span class="assessment-result-value" data-total="T">Pending</span>
                     </div>
                 </div>
@@ -526,7 +639,7 @@
                 <div class="assessment-rating-row">
                     <strong>Overall Performance Rating</strong><span>=</span>
                     <span data-total="T-rating">Pending</span>
-                    <span>/ 5</span><span>× 100 = <strong data-total="percentage">Pending</strong></span>
+                    <span>T ÷ 5 × 100 = <strong data-total="percentage">Pending</strong></span>
                 </div>
 
                 <p class="rating-guidance"><strong>NB:</strong> Please use the scale below to interpret the overall performance of the appraisee.</p>
@@ -627,21 +740,21 @@
                 name="action"
                 value="submit"
                 class="btn btn-success"
-                data-confirm="Submit this appraisal to the HOD?"
+                data-confirm="{% if is_hod_review %}Submit this appraisal to HR?{% else %}Submit this appraisal to the HOD?{% endif %}"
                 data-confirm-title="Submit appraisal?"
-                data-confirm-label="Submit to HOD"
-            >Save and Submit to HOD</button>
+                data-confirm-label="{% if is_hod_review %}Submit to HR{% else %}Submit to HOD{% endif %}"
+            >Save and Submit to {% if is_hod_review %}HR{% else %}HOD{% endif %}</button>
         </div>
     </form>
 
-    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mt-4 border-warning return-review-form">
+    <form method="POST" action="{% url 'return_appraisal' appraisal.id %}" class="card mt-4 return-review-form">
         {% csrf_token %}
-        <div class="card-header bg-warning">Return to Employee for Corrections</div>
+        <div class="card-header">Return to {% if is_hod_review %}Supervisor{% else %}Employee{% endif %} for Corrections</div>
         <div class="card-body">
             {{ return_form.comment.label_tag }}
             {{ return_form.comment }}
             {{ return_form.comment.errors }}
-            <button type="submit" class="btn btn-warning mt-3">Return to Employee</button>
+            <button type="submit" class="btn btn-primary mt-3">Return to {% if is_hod_review %}Supervisor{% else %}Employee{% endif %}</button>
         </div>
     </form>
 </div>

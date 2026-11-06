@@ -3,8 +3,22 @@
     <div class="appraisal-section-body">
         <div class="appraisal-comment-box">{{ appraisal.hod_comments|default:"No HOD comments provided."|linebreaksbr }}</div>
         <div class="appraisal-signature-row">
-            <span><strong>HOD’s signature:</strong> {% if appraisal.hod_signed_at %}{{ appraisal.hod.user.get_full_name|default:appraisal.hod.user.username }}{% else %}Not signed yet{% endif %}</span>
+            <span><strong>HOD’s signature:</strong>
+                {% if appraisal.hod_signed_at %}
+                    {% if appraisal.employee.role == 'HOD' %}
+                        {{ appraisal.employee.user.get_full_name|default:appraisal.employee.user.username }}
+                    {% elif appraisal.hod %}
+                        {{ appraisal.hod.user.get_full_name|default:appraisal.hod.user.username }}
+                    {% else %}
+                        Not signed yet
+                    {% endif %}
+                {% else %}
+                    Not signed yet
+                {% endif %}
+            </span>
             <span><strong>Date:</strong> {{ appraisal.hod_signed_at|date:"d/m/Y"|default:"—" }}</span>
         </div>
     </div>
 </section>
+
+

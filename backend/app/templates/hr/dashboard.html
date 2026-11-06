@@ -52,7 +52,7 @@
             margin: 1.2rem .7rem .55rem;
             text-transform: uppercase;
         }
-        .hr-sidebar-nav { display: grid; gap: .55rem; }
+        .hr-sidebar-nav { display: grid; gap: .55rem; grid-template-columns: minmax(0, 1fr); }
         .hr-sidebar-link {
             align-items: center;
             background: transparent;
@@ -175,11 +175,23 @@
             border-radius: 16px;
             overflow: hidden;
         }
+        .hr-dashboard-shell .table-responsive {
+            max-width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+        .hr-dashboard-shell .hr-table-card.table-responsive {
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+        .hr-dashboard-shell .table-responsive > .table { min-width: 720px; }
         .hr-table-card .table { margin-bottom: 0; }
         .hr-role-form { align-items: center; display: flex; gap: .6rem; min-width: 260px; }
         .hr-role-form .form-select { min-width: 150px; }
         .hr-role-save { white-space: nowrap; }
         .hr-sidebar-toggle { display: none; }
+        .hr-sidebar-drawer-brand { display: none; }
         .hr-role-search { margin-bottom: 1rem; max-width: 420px; }
         .hr-dashboard-section:not([data-dashboard-section="overview"]) { animation: hr-section-enter .28s ease both; }
         .hr-section-heading {
@@ -336,19 +348,106 @@
         }
         @media (max-width: 767.98px) {
             .hr-dashboard-shell { display: block; }
-            .hr-dashboard-sidebar { min-height: 0; padding: .8rem 1rem; position: static; }
-            .hr-sidebar-brand { border: 0; justify-content: space-between; margin: 0; padding: 0; }
-            .hr-sidebar-toggle { align-items: center; background: #214457; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; color: #fff; display: inline-flex; gap: .45rem; padding: .45rem .7rem; }
+            .hr-dashboard-sidebar { background: transparent; min-height: 0; padding: 0; position: static; z-index: auto; }
+            .hr-sidebar-brand { display: none; }
+            .hr-sidebar-toggle {
+                align-items: center;
+                background: #142d3c;
+                border: 1px solid rgba(255,255,255,.2);
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(4,22,32,.2);
+                color: #fff;
+                display: inline-flex;
+                flex: 0 0 42px;
+                height: 42px;
+                justify-content: center;
+                left: .85rem;
+                margin: 0;
+                order: 0;
+                padding: .45rem;
+                position: fixed;
+                top: 4.5rem;
+                z-index: 1035;
+            }
+            .hr-sidebar-toggle-label { display: none; }
             .hr-sidebar-label { display: none; }
-            .hr-sidebar-nav { display: none; gap: .45rem; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .8rem; }
-            .hr-dashboard-sidebar.is-expanded .hr-sidebar-nav { display: grid; }
-            .hr-sidebar-link { gap: .5rem; min-height: 54px; min-width: 0; padding: .5rem; white-space: normal; width: auto; }
+            .hr-sidebar-backdrop:not([hidden]) {
+                background: rgba(5, 20, 29, .55);
+                border: 0;
+                display: block;
+                inset: 0;
+                position: fixed;
+                z-index: 1040;
+            }
+            .hr-sidebar-backdrop[hidden] { display: none !important; }
+            .hr-sidebar-nav {
+                display: grid;
+                gap: .45rem;
+                grid-template-columns: minmax(0, 1fr);
+                align-content: start;
+                background: #142d3c;
+                bottom: 0;
+                box-shadow: 12px 0 32px rgba(4, 22, 32, .24);
+                left: 0;
+                margin: 0;
+                max-width: min(84vw, 300px);
+                overflow-x: hidden;
+                overflow-y: auto;
+                padding: 1.25rem 1rem;
+                position: fixed;
+                top: 0;
+                transform: translateX(-105%);
+                transition: transform .28s ease, visibility 0s linear .28s;
+                visibility: hidden;
+                width: 300px;
+                z-index: 1041;
+            }
+            .hr-sidebar-drawer-brand {
+                align-items: center;
+                border-bottom: 1px solid rgba(255,255,255,.12);
+                color: #fff;
+                display: flex;
+                gap: .75rem;
+                margin: 0 0 .75rem;
+                padding: .25rem .2rem 1rem;
+            }
+            .hr-sidebar-drawer-copy {
+                flex: 1;
+                font-size: .88rem;
+                font-weight: 750;
+                line-height: 1.25;
+                min-width: 0;
+            }
+            .hr-sidebar-drawer-copy small {
+                color: #b7c8d0;
+                display: block;
+                font-size: .68rem;
+                font-weight: 500;
+                margin-top: .2rem;
+            }
+            .hr-sidebar-close {
+                align-items: center;
+                background: rgba(255,255,255,.08);
+                border: 1px solid rgba(255,255,255,.14);
+                border-radius: 9px;
+                color: #fff;
+                display: inline-flex;
+                flex: 0 0 36px;
+                height: 36px;
+                justify-content: center;
+            }
+            .hr-dashboard-sidebar.is-expanded .hr-sidebar-nav {
+                transform: none;
+                visibility: visible;
+                transition-delay: 0s;
+            }
+            .hr-sidebar-link { gap: .5rem; min-height: 54px; min-width: 0; padding: .5rem; white-space: normal; width: 100%; }
             .hr-sidebar-link:hover { transform: none; }
             .hr-sidebar-link-title { font-size: .76rem; }
             .hr-sidebar-link-note { display: none; }
             .hr-sidebar-icon { flex-basis: 32px; height: 32px; }
             .hr-sidebar-link.active { box-shadow: inset 0 0 0 1px rgba(39, 200, 181, .25); }
-            .hr-dashboard-content { padding: 1.1rem; }
+            .hr-dashboard-content { padding: 4.75rem 1.1rem 1.1rem; }
             .hr-dashboard-filters { width: 100%; }
             .hr-dashboard-filters > div { flex: 1 1 140px; }
             .hr-dashboard-filters select { width: 100%; }
@@ -357,24 +456,38 @@
             .hr-assignment-card-body { padding: 1rem; }
             .hr-dashboard-section:not([data-dashboard-section="overview"]) .table thead th,
             .hr-dashboard-section:not([data-dashboard-section="overview"]) .table tbody td { padding: .72rem; }
+            .hr-dashboard-shell .table-responsive { overscroll-behavior-x: contain; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .hr-dashboard-sidebar *, .hr-dashboard-sidebar *::before, .hr-dashboard-sidebar *::after {
+                transition-duration: .01ms !important;
+            }
+            .hr-sidebar-nav { transition-duration: .01ms !important; }
         }
     </style>
 
     <aside class="hr-dashboard-sidebar" aria-label="HR dashboard navigation">
+        <button
+            class="hr-sidebar-toggle"
+            type="button"
+            aria-controls="hr-dashboard-navigation"
+            aria-expanded="false"
+            aria-label="Open menu"
+        >
+            <span aria-hidden="true">☰</span>
+        </button>
         <div class="hr-sidebar-brand">
             <span class="hr-sidebar-mark" aria-hidden="true">✚</span>
             <span>Mathias Catholic Hospital<br><small class="fw-normal opacity-75">HR WORKSPACE</small></span>
-            <button
-                class="hr-sidebar-toggle"
-                type="button"
-                aria-controls="hr-dashboard-navigation"
-                aria-expanded="false"
-            >
-                <span aria-hidden="true">☰</span> Menu
-            </button>
         </div>
         <div class="hr-sidebar-label">Workspace</div>
+        <button class="hr-sidebar-backdrop" type="button" aria-label="Close menu" hidden></button>
         <nav class="hr-sidebar-nav" id="hr-dashboard-navigation">
+            <div class="hr-sidebar-drawer-brand">
+                <span class="hr-sidebar-mark" aria-hidden="true">✚</span>
+                <span class="hr-sidebar-drawer-copy">Mathias Catholic Hospital<small>HR WORKSPACE</small></span>
+                <button class="hr-sidebar-close" type="button" aria-label="Close menu" data-sidebar-close>×</button>
+            </div>
             <button class="hr-sidebar-link active" type="button" data-dashboard-target="overview">
                 <span class="hr-sidebar-icon" aria-hidden="true">▦</span>
                 <span class="hr-sidebar-link-copy"><span class="hr-sidebar-link-title">Overview</span></span>
@@ -404,8 +517,8 @@
             <button class="hr-sidebar-link" type="button" data-dashboard-target="assignments">
                 <span class="hr-sidebar-icon" aria-hidden="true">⇄</span>
                 <span class="hr-sidebar-link-copy">
-                    <span class="hr-sidebar-link-title">Supervisor assignments</span>
-                    <span class="hr-sidebar-link-note">Manage reporting lines</span>
+                    <span class="hr-sidebar-link-title">Assignments</span>
+                    <span class="hr-sidebar-link-note">Manage department and reporting roles</span>
                 </span>
             </button>
             <a class="hr-sidebar-link" href="{% url 'new_app_cycle' %}">
@@ -413,6 +526,13 @@
                 <span class="hr-sidebar-link-copy">
                     <span class="hr-sidebar-link-title">Appraisal cycles</span>
                     <span class="hr-sidebar-link-note">Create and manage cycles</span>
+                </span>
+            </a>
+            <a class="hr-sidebar-link" href="{% url 'audit_log' %}">
+                <span class="hr-sidebar-icon" aria-hidden="true">▤</span>
+                <span class="hr-sidebar-link-copy">
+                    <span class="hr-sidebar-link-title">Audit log</span>
+                    <span class="hr-sidebar-link-note">View recorded changes</span>
                 </span>
             </a>
         </nav>
@@ -659,28 +779,31 @@
     <section
         class="hr-dashboard-section"
         data-dashboard-section="assignments"
-        data-has-errors="{% if transfer_confirmation or supervisor_assignment_form.errors %}true{% else %}false{% endif %}"
-        aria-label="Supervisor assignments"
+        data-has-errors="{% if transfer_confirmation or reporting_confirmation or supervisor_assignment_form.errors or reporting_form.errors or department_hod_assignment_form.errors %}true{% else %}false{% endif %}"
+        aria-label="Department and supervisor assignments"
         hidden
     >
         <div class="hr-section-heading">
-            <h3>Supervisor Assignments</h3>
-            <p>Assign employees to supervisors within the same department and manage existing reporting lines.</p>
+            <h3>Department Reviewer Assignments</h3>
+            <p>Assign one reviewer to each department. Employees submit their appraisals to this person.</p>
+            <a class="btn btn-sm hr-action-accent" href="{% url 'hr_supervisor_assignments' %}">
+                Manage reviewer assignments
+            </a>
         </div>
         <div class="hr-assignment-card mb-4">
-            <div class="hr-assignment-card-heading"><span aria-hidden="true">⇄</span>Assign or Change Supervisor</div>
+            <div class="hr-assignment-card-heading"><span aria-hidden="true">⇄</span>Assign or Change Department Reviewer</div>
             <div class="hr-assignment-card-body">
                 {% if transfer_confirmation %}
                     <div class="hr-transfer-confirmation mb-3" role="alert">
                         <strong>Confirm appraisal transfer</strong>
                         <p class="mb-2">
                             This will transfer {{ transfer_confirmation.appraisal_count }} in-progress
-                            appraisal(s) for {{ transfer_confirmation.employee_name }} to
+                            appraisal(s) for the {{ transfer_confirmation.department_name }} department to
                             {{ transfer_confirmation.supervisor_name }}. Existing scores, comments,
                             and return history will be preserved.
                         </p>
                         <button class="btn hr-action-accent mb-3" type="button" id="confirm-assignment-transfer">
-                            Confirm supervisor transfer
+                            Confirm reviewer transfer
                         </button>
                     </div>
                 {% endif %}
@@ -700,10 +823,108 @@
                     {% if supervisor_assignment_form.non_field_errors %}
                         <div class="hr-form-errors">{{ supervisor_assignment_form.non_field_errors }}</div>
                     {% endif %}
-                    <button type="submit" class="btn hr-action-primary">Save Supervisor Assignment</button>
+                    <button type="submit" class="btn hr-action-primary">Save Department Reviewer</button>
                 </form>
 
             </div>
+        </div>
+
+        <div class="hr-assignment-card mb-4">
+            <div class="hr-assignment-card-heading"><span aria-hidden="true">⌂</span>Assign or Change Department HOD</div>
+            <div class="hr-assignment-card-body">
+                <p class="text-muted">Choose the HOD responsible for reviewing appraisals from each department.</p>
+                <form method="post" action="{% url 'hr_dashboard' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="hod_assignment_action" value="save">
+                    {% for field in department_hod_assignment_form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <div class="hr-field-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                    <button type="submit" class="btn hr-action-primary">Save Department HOD</button>
+                </form>
+            </div>
+        </div>
+
+        <h4>Current Department HOD Assignments</h4>
+        <div class="hr-table-card table-responsive mb-4">
+            <table class="table table-hover bg-white">
+                <thead>
+                    <tr><th>Department</th><th>Head of Department</th></tr>
+                </thead>
+                <tbody>
+                    {% for assignment in department_hod_assignments %}
+                        <tr>
+                            <td>{{ assignment.department.name }}</td>
+                            <td>{{ assignment.hod.user.get_full_name|default:assignment.hod.user.username }} ({{ assignment.hod.user.username }})</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="2" class="text-center">No department HODs assigned yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="hr-assignment-card mb-4">
+            <div class="hr-assignment-card-heading"><span aria-hidden="true">↗</span>Assign or Change a Supervisor’s HOD</div>
+            <div class="hr-assignment-card-body">
+                <p class="text-muted">Assign the HOD who reviews each supervisor’s own appraisal.</p>
+                {% if reporting_confirmation %}
+                    <div class="hr-transfer-confirmation mb-3" role="alert">
+                        <strong>Confirm appraisal transfer</strong>
+                        <p class="mb-2">
+                            This will transfer {{ reporting_confirmation.appraisal_count }} in-progress appraisal(s)
+                            for {{ reporting_confirmation.supervisor_name }} to {{ reporting_confirmation.manager_name }}.
+                            Existing scores, comments, and return history will be preserved.
+                        </p>
+                        <button class="btn hr-action-accent" type="button" id="confirm-reporting-transfer">
+                            Confirm supervisor transfer
+                        </button>
+                    </div>
+                {% endif %}
+                <form method="post" action="{% url 'hr_dashboard' %}" id="hr-dashboard-reporting-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="reporting_action" value="save">
+                    <input type="hidden" name="confirm_transfer" id="reporting-confirm-transfer" value="">
+                    {% for field in reporting_form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% for error in field.errors %}
+                                <div class="hr-field-error">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+                    {% if reporting_form.non_field_errors %}
+                        <div class="hr-form-errors">{{ reporting_form.non_field_errors }}</div>
+                    {% endif %}
+                    <button type="submit" class="btn hr-action-primary">Save Supervisor Reporting Line</button>
+                </form>
+            </div>
+        </div>
+
+        <h4>Current Supervisor Reporting Lines</h4>
+        <div class="hr-table-card table-responsive mb-4">
+            <table class="table table-hover bg-white">
+                <thead>
+                    <tr><th>Supervisor</th><th>Department</th><th>Reports to HOD</th></tr>
+                </thead>
+                <tbody>
+                    {% for assignment in supervisor_reporting_assignments %}
+                        <tr>
+                            <td>{{ assignment.supervisor.user.get_full_name|default:assignment.supervisor.user.username }} ({{ assignment.supervisor.user.username }})</td>
+                            <td>{{ assignment.supervisor.department.name|default:"—" }}</td>
+                            <td>{{ assignment.manager.user.get_full_name|default:assignment.manager.user.username }} ({{ assignment.manager.user.username }})</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="3" class="text-center">No supervisor reporting lines assigned yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
 
         <h4>Current Assignments</h4>
@@ -714,7 +935,7 @@
                     id="dashboard-assignment-search"
                     type="search"
                     class="form-control"
-                    placeholder="Staff ID, employee, supervisor, or department"
+                    placeholder="Staff ID, reviewer, or department"
                     autocomplete="off"
                 >
             </div>
@@ -734,15 +955,14 @@
                 <thead>
                     <tr>
                         <th>Department</th>
-                        <th>Employee</th>
-                        <th>Supervisor</th>
+                        <th>Department reviewer</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="dashboard-assignment-results"></tbody>
             </table>
         </div>
-        <nav aria-label="Supervisor assignment results">
+        <nav aria-label="Department reviewer assignment results">
             <ul id="dashboard-assignment-pagination" class="pagination mt-3"></ul>
         </nav>
     </section>
@@ -825,14 +1045,46 @@
     (() => {
         const sidebar = document.querySelector('.hr-dashboard-sidebar');
         const sidebarToggle = document.querySelector('.hr-sidebar-toggle');
+        const navigation = document.querySelector('.hr-sidebar-nav');
+        const closeButton = document.querySelector('[data-sidebar-close]');
         const navigationButtons = [...document.querySelectorAll('[data-dashboard-target]')];
         const sections = [...document.querySelectorAll('[data-dashboard-section]')];
         if (!navigationButtons.length || !sections.length) return;
 
+        function syncNavigationState() {
+            const mobile = window.matchMedia('(max-width: 767.98px)').matches;
+            const expanded = mobile && sidebar.classList.contains('is-expanded');
+            sidebarToggle?.setAttribute('aria-expanded', String(expanded));
+            sidebarToggle?.setAttribute('aria-label', expanded ? 'Close menu' : 'Open menu');
+            const backdrop = document.querySelector('.hr-sidebar-backdrop');
+            if (backdrop) backdrop.hidden = !expanded;
+            if (navigation) {
+                navigation.inert = mobile && !expanded;
+                navigation.setAttribute('aria-hidden', String(mobile && !expanded));
+            }
+        }
+
         sidebarToggle?.addEventListener('click', () => {
-            const expanded = sidebar.classList.toggle('is-expanded');
-            sidebarToggle.setAttribute('aria-expanded', String(expanded));
+            sidebar.classList.toggle('is-expanded');
+            syncNavigationState();
         });
+        document.querySelector('.hr-sidebar-backdrop')?.addEventListener('click', () => {
+            sidebar.classList.remove('is-expanded');
+            syncNavigationState();
+        });
+        closeButton?.addEventListener('click', () => {
+            sidebar.classList.remove('is-expanded');
+            syncNavigationState();
+            sidebarToggle?.focus();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && sidebar.classList.contains('is-expanded')) {
+                sidebar.classList.remove('is-expanded');
+                syncNavigationState();
+                sidebarToggle?.focus();
+            }
+        });
+        window.addEventListener('resize', syncNavigationState);
 
         function showSection(sectionName, updateHistory) {
             const target = sections.find((section) => section.dataset.dashboardSection === sectionName);
@@ -848,7 +1100,7 @@
             });
             if (window.matchMedia('(max-width: 767.98px)').matches && sidebar.classList.contains('is-expanded')) {
                 sidebar.classList.remove('is-expanded');
-                sidebarToggle?.setAttribute('aria-expanded', 'false');
+                syncNavigationState();
             }
 
             if (sectionName === 'overview' && window.hrDashboardCharts) {
@@ -870,6 +1122,7 @@
                 || (assignmentSection?.dataset.hasErrors === 'true' ? 'assignments' : 'overview');
             showSection(initialSection, false);
         });
+        syncNavigationState();
         showSection(window.location.hash.slice(1) || 'overview', false);
     })();
 </script>
@@ -878,18 +1131,16 @@
     (() => {
         const form = document.getElementById('hr-dashboard-assignment-form');
         const departmentSelect = document.getElementById('id_department');
-        const employeeSelect = document.getElementById('id_employee');
         const supervisorSelect = document.getElementById('id_supervisor');
         const searchInput = document.getElementById('dashboard-assignment-search');
         const departmentFilter = document.getElementById('dashboard-assignment-department');
         const resultsBody = document.getElementById('dashboard-assignment-results');
         const statusElement = document.getElementById('dashboard-assignment-status');
         const pagination = document.getElementById('dashboard-assignment-pagination');
-        if (!form || !departmentSelect || !employeeSelect || !supervisorSelect) return;
+        if (!form || !departmentSelect || !supervisorSelect) return;
 
         const optionsUrl = "{% url 'hr_assignment_options' %}";
         const searchUrl = "{% url 'hr_search_supervisor_assignments' %}";
-        const initialEmployee = employeeSelect.value;
         const initialSupervisor = supervisorSelect.value;
         let searchTimer;
         let activeSearch;
@@ -898,41 +1149,32 @@
             select.replaceChildren(new Option(placeholder, ''));
         }
 
-        async function loadOptions(preserveEmployee, preserveSupervisor) {
+        async function loadOptions(preserveSupervisor) {
             const departmentId = departmentSelect.value;
-            resetSelect(employeeSelect, 'Select an employee');
-            resetSelect(supervisorSelect, 'Select a supervisor');
-            employeeSelect.disabled = true;
+            resetSelect(supervisorSelect, 'Select a department reviewer');
             supervisorSelect.disabled = true;
             if (!departmentId) return;
 
             const params = new URLSearchParams({ department_id: departmentId });
-            if (preserveEmployee) params.set('employee_id', preserveEmployee);
             try {
                 const response = await fetch(`${optionsUrl}?${params.toString()}`);
                 const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Could not load department employees and supervisors.');
-                data.employees.forEach((employee) => employeeSelect.add(new Option(employee.label, employee.id)));
+                if (!response.ok) throw new Error(data.error || 'Could not load department reviewers.');
                 data.supervisors.forEach((supervisor) => supervisorSelect.add(new Option(supervisor.label, supervisor.id)));
-                if (preserveEmployee) employeeSelect.value = preserveEmployee;
                 if (preserveSupervisor) supervisorSelect.value = preserveSupervisor;
                 else if (data.current_supervisor_id) supervisorSelect.value = data.current_supervisor_id;
             } catch (error) {
                 window.showAppModal(error.message, 'Could not load assignments');
             } finally {
-                employeeSelect.disabled = false;
                 supervisorSelect.disabled = false;
             }
         }
 
-        departmentSelect.addEventListener('change', () => loadOptions('', ''));
-        employeeSelect.addEventListener('change', () => loadOptions(employeeSelect.value, ''));
+        departmentSelect.addEventListener('change', () => loadOptions(''));
         if (departmentSelect.value) {
-            loadOptions(initialEmployee, initialSupervisor);
+            loadOptions(initialSupervisor);
         } else {
-            resetSelect(employeeSelect, 'Select a department first');
             resetSelect(supervisorSelect, 'Select a department first');
-            employeeSelect.disabled = true;
             supervisorSelect.disabled = true;
         }
 
@@ -963,7 +1205,7 @@
             if (!data.results.length) {
                 const row = document.createElement('tr');
                 const cell = document.createElement('td');
-                cell.colSpan = 4;
+                cell.colSpan = 3;
                 cell.className = 'text-center';
                 cell.textContent = 'No matching supervisor assignments found.';
                 row.append(cell);
@@ -974,7 +1216,6 @@
                 const row = document.createElement('tr');
                 [
                     assignment.department,
-                    `${assignment.employee_staff_id} - ${assignment.employee_name}`,
                     `${assignment.supervisor_staff_id} - ${assignment.supervisor_name}`,
                 ].forEach((value) => {
                     const cell = document.createElement('td');
@@ -988,7 +1229,7 @@
                 editButton.textContent = 'Change';
                 editButton.addEventListener('click', async () => {
                     departmentSelect.value = assignment.department_id;
-                    await loadOptions(String(assignment.employee_id), String(assignment.supervisor_id));
+                    await loadOptions(String(assignment.supervisor_id));
                     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 });
                 actionCell.append(editButton);
@@ -1034,6 +1275,10 @@
         document.getElementById('confirm-assignment-transfer')?.addEventListener('click', () => {
             document.getElementById('assignment-confirm-transfer').value = '1';
             form.requestSubmit();
+        });
+        document.getElementById('confirm-reporting-transfer')?.addEventListener('click', () => {
+            document.getElementById('reporting-confirm-transfer').value = '1';
+            document.getElementById('hr-dashboard-reporting-form').requestSubmit();
         });
     })();
 </script>
